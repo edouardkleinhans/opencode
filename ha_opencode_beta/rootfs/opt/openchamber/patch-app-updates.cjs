@@ -55,6 +55,12 @@ const messages = {
     "{version} sürümü mevcut. OpenCode’u kurduğunuz yöntemle güncelleyin, ardından OpenChamber’ı yeniden başlatın.",
     "OpenCode projesi {version} sürümünü yayımladı. Bu uygulamanın OpenCode ve OpenChamber sürümlerini Home Assistant Supervisor yönetir. Güncellemeler için Home Assistant içindeki uygulama sayfasını kontrol edin; bu OpenCode sürümü, bir uygulama güncellemesinin mevcut olduğu anlamına gelmez.",
   ],
+  // Added with the v2.0.4 Dutch locale. Verbatim upstream text; the app-owned
+  // wording keeps the formal "u" register the upstream dictionary already uses.
+  nl: [
+    "Versie {version} beschikbaar. Werk OpenCode bij op de manier waarop u het hebt geïnstalleerd en herstart daarna OpenChamber.",
+    "Het upstream-project OpenCode heeft versie {version} uitgebracht. Home Assistant Supervisor beheert de OpenCode- en OpenChamber-versies van deze app. Controleer de app-pagina in Home Assistant op updates; deze upstream-versie betekent niet dat er een update van de app beschikbaar is.",
+  ],
 };
 
 function patchAppUpdates(root) {

@@ -15,25 +15,31 @@ function patchUsageModel(root) {
     files.set(file, replaceOnce(source, before, after, file));
   };
   const auth = "packages/web/server/lib/opencode/auth.js";
-  edit(auth, `  const legacy = readLegacyAuthFile();
-  const stored = readCredentialsFromDb({
-    dbPath: resolveCredentialDbPath({ dataDir: OPENCODE_DATA_DIR, path }),
-    fs,
-  });
-  return stored ? { ...legacy, ...stored } : legacy;`, `  // The HA launcher supplies the active V2 generation's database path only.
+  edit(auth, `function readAuthFile(options = {}) {
+  const {
+    dbPath = resolveCredentialDbPath({ dataDir: OPENCODE_DATA_DIR, path }),
+    authFile = AUTH_FILE,
+    fileSystem = fs,
+  } = options;
+  const stored = readCredentialsFromDb({ dbPath, fs: fileSystem });
+  if (stored) return stored;
+  return readLegacyAuthFile(authFile, fileSystem);
+}`, `function readAuthFile(options = {}) {
+  // The HA launcher supplies the active V2 generation's database path only.
   // Never merge retained V1 auth, including after disconnect or a read failure.
-  const dbPath = process.env.OPENCODE_DB;
+  const { dbPath = process.env.OPENCODE_DB, fileSystem = fs } = options;
   if (!dbPath || !path.isAbsolute(dbPath)) throw new Error('Managed provider credentials unavailable');
-  const stored = readCredentialsFromDb({ dbPath, fs });
+  const stored = readCredentialsFromDb({ dbPath, fs: fileSystem });
   if (stored === null) throw new Error('Managed provider credentials unavailable');
-  return stored;`);
+  return stored;
+}`);
   edit(auth, "readCredentialsFromDb, resolveCredentialDbPath", "readCredentialsFromDb");
-  edit(auth, `function readLegacyAuthFile() {
-  if (!fs.existsSync(AUTH_FILE)) {
+  edit(auth, `function readLegacyAuthFile(authFile, fileSystem) {
+  if (!fileSystem.existsSync(authFile)) {
     return {};
   }
   try {
-    const content = fs.readFileSync(AUTH_FILE, 'utf8');
+    const content = fileSystem.readFileSync(authFile, 'utf8');
     const trimmed = content.trim();
     if (!trimmed) {
       return {};
@@ -46,7 +52,7 @@ function patchUsageModel(root) {
 }
 `, "// Legacy paths remain exported for upstream compatibility, but auth is V2-only.\n");
   const db = "packages/web/server/lib/opencode/credential-db.js";
-  // Match OpenCode 2.0.13's active / creation-time / ID selection, not refresh time.
+  // Match OpenCode 2.0.20's active / creation-time / ID selection, not refresh time.
   edit(db, "ORDER BY integration_id, active DESC, time_updated DESC",
     "ORDER BY integration_id, active DESC, time_created DESC, id DESC");
   edit(db, `    const result = {};
