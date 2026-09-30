@@ -3,6 +3,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## 3.1.0
+
+- Restore supported V1 OpenAI-compatible provider settings through validated, in-memory V2 conversion; thanks @nomonkeynodeal for reporting [#141](https://github.com/magnusoverli/opencode/issues/141).
+- Explain configuration failures directly in the terminal before the resulting sidecar warning; thanks @smw6180, @Sebazzz and @MechaMtt for reporting [#139](https://github.com/magnusoverli/opencode/issues/139).
+- Add opt-in `openchamber_lan_native_apps` for native OpenChamber login through the HTTPS LAN frontend, with authenticated token/CORS/stream coverage; thanks @Rahulsharma0810 for reporting [#135](https://github.com/magnusoverli/opencode/issues/135) and contributing [#136](https://github.com/magnusoverli/opencode/pull/136).
+- Identify the exact `/homeassistant` mount/ownership failure at pre-init without changing files; thanks @arretx and @bbo76 for reporting [#138](https://github.com/magnusoverli/opencode/issues/138), whose underlying mount issue still needs affected-host evidence.
+- Clarify MCP migration, history-picker limits, custom-agent availability, V2 client health and screenshot paste; thanks @horve000, @BBungalow, @SolutechUK, @naspinec and @AngeloAna for the reports ([#129](https://github.com/magnusoverli/opencode/issues/129), [#134](https://github.com/magnusoverli/opencode/issues/134), [#140](https://github.com/magnusoverli/opencode/issues/140), [#142](https://github.com/magnusoverli/opencode/issues/142), [#143](https://github.com/magnusoverli/opencode/issues/143)); remaining implementation/design questions stay open.
+
 ## 3.0.10
 
 - Explain first-boot migration progress and temporary Ingress 502s while large histories convert, so users know when startup finishes without restarting ([#130](https://github.com/magnusoverli/opencode/issues/130)).

@@ -34,7 +34,12 @@ fi
 echo ""
 
 if [ ! -f /run/opencode-v2/ready ] || [ ! -f /run/opencode-v2-homeassistant.ready ]; then
-    if jq -e '.status == "failed" and .error == "session_projection_mismatch"' /data/v2/migration.json >/dev/null 2>&1; then
+    if [ -f /run/opencode-v2/configuration-error ]; then
+        echo -e "${YELLOW}${BOLD}OpenCode could not start: custom configuration could not be prepared.${NC}"
+        echo -e "${GRAY}Check the add-on logs for 'opencode_config' or 'external_mcp_config'.${NC}"
+        echo -e "${GRAY}Correct the corresponding option in the Configuration tab, then restart the add-on.${NC}"
+        echo -e "${GRAY}The Home Assistant sidecar waits for valid configuration; reinstalling is not required.${NC}"
+    elif jq -e '.status == "failed" and .error == "session_projection_mismatch"' /data/v2/migration.json >/dev/null 2>&1; then
         echo -e "${YELLOW}${BOLD}OpenCode could not start: conversation migration needs attention.${NC}"
         echo -e "${GRAY}The V1-to-V2 session check found a mismatch. Your existing state was preserved.${NC}"
         echo -e "${GRAY}Check the add-on logs for 'session_projection_mismatch' and the differing field names.${NC}"

@@ -286,6 +286,10 @@ RUN printf '%s\n' "${OPENCHAMBER_VERSION}" > /usr/local/share/openchamber-certif
 # Copy root filesystem (server code, scripts, etc.)
 COPY rootfs /
 
+# Verify the LAN native-app flow against the pinned UI's actual authentication.
+RUN --mount=type=bind,source=test/v2-ui-lan-fixture.mjs,target=/tmp/v2-ui-lan-fixture.mjs,readonly \
+    timeout --signal=TERM --kill-after=5s 45s node /tmp/v2-ui-lan-fixture.mjs
+
 # Make scripts executable and create runtime directories
 RUN chmod +x /usr/local/bin/* \
     && chmod +x /opt/openchamber/patch-ingress.js \

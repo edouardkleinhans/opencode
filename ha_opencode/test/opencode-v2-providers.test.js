@@ -22,6 +22,84 @@ const options = (config, extra = {}) => ({
 });
 
 describe("bounded native V2 provider configuration", () => {
+  it("accepts the reported V1 local provider without changing saved options or managed policy", () => {
+    const input = options({ provider: { "my-local": {
+      npm: "@ai-sdk/openai-compatible", name: "My Local Stack",
+      options: { baseURL: "http://192.0.2.50:1234/v1" },
+      models: { "your-model-id": { name: "Your Model" } },
+    } } });
+    const original = structuredClone(input);
+    const warnings = [];
+    const result = prepareUserConfig(input, { warn: (message) => warnings.push(message) });
+    assert.deepEqual(result.config, { providers: { "my-local": {
+      package: "@opencode/ai/providers/openai-compatible", name: "My Local Stack",
+      settings: { baseURL: "http://192.0.2.50:1234/v1" },
+      models: { "your-model-id": { name: "Your Model" } },
+    } } });
+    assert.deepEqual(input, original);
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /converted.*saved options are unchanged/);
+    assert.doesNotMatch(warnings[0], /192\.0\.2|my-local|fixture-key/);
+  });
+
+  it("preserves legacy model aliases, limits, modalities, pricing, requests and variants", () => {
+    const input = options({ model: "legacy/coding", provider: { legacy: {
+      env: ["FIXTURE_API_KEY"], api: "https://fixture.test/v1",
+      options: { apiKey: "{env:FIXTURE_API_KEY}", headers: { "X-Fixture": "one" }, body: { store: false } },
+      models: { coding: { id: "upstream/model", name: "Coding", family: "fixture", tool_call: true,
+        modalities: { input: ["text", "image"], output: ["text"] }, limit: { context: 8192, output: 1024 },
+        cost: { input: 1, output: 2, cache_read: 0.5, cache_write: 1.5 },
+        options: { temperature: 0.2 }, headers: { "X-Model": "two" },
+        variants: { low: { reasoningEffort: "low", body: { service_tier: "flex" } } },
+      } },
+    } }, providers: { fixture: nativeProvider() } });
+    const { config } = prepareUserConfig(input);
+    assert.equal(config.provider, undefined);
+    assert.equal(config.model, "legacy/coding");
+    assert.deepEqual(config.providers.fixture, nativeProvider());
+    assert.deepEqual(config.providers.legacy, {
+      env: ["FIXTURE_API_KEY"], settings: { apiKey: "{env:FIXTURE_API_KEY}", baseURL: "https://fixture.test/v1" },
+      headers: { "X-Fixture": "one" }, body: { store: false },
+      models: { coding: { modelID: "upstream/model", name: "Coding", family: "fixture",
+        capabilities: { input: ["text", "image"], output: ["text"], tools: true }, limit: { context: 8192, output: 1024 },
+        cost: { input: 1, output: 2, cache: { read: 0.5, write: 1.5 } },
+        settings: { temperature: 0.2 }, headers: { "X-Model": "two" },
+        variants: [{ id: "low", settings: { reasoningEffort: "low" }, body: { service_tier: "flex" } }],
+      } },
+    });
+  });
+
+  it("applies every native policy restriction after legacy provider conversion", () => {
+    for (const provider of [
+      { npm: "file:///tmp/private-package" },
+      { npm: "@ai-sdk/anthropic" },
+      { options: { apiKey: "{file:/run/opencode-v2/server-password}" } },
+      { options: { apiKey: "{env:SUPERVISOR_TOKEN}" } },
+      { env: ["HA_API_KEY"] },
+      { options: { baseURL: "https://user:secret@example.invalid" } },
+      { options: { headers: { Authorization: "first\r\nsecond" } } },
+      { models: { coding: { limit: { context: -1 } } } },
+      { models: { coding: { modalities: { input: ["unsupported"] } } } },
+      { models: { coding: { tool_call: "true" } } },
+      { models: { coding: { variants: { hidden: { disabled: true } } } } },
+      { models: { coding: { invented: fixtureKey } } },
+      { api: "https://first.test", options: { baseURL: "https://second.test" } },
+      { models: { coding: { headers: {}, options: { headers: {} } } } },
+    ]) assert.throws(() => prepareUserConfig(options({ provider: { fixture: provider } })), (error) => {
+      assert.match(error.message, /opencode_config:/);
+      assert.doesNotMatch(error.message, /private-package|server-password|SUPERVISOR_TOKEN|example\.invalid|fixture-key/);
+      return true;
+    });
+    assert.throws(() => prepareUserConfig(options({ provider: { fixture: {} }, providers: { fixture: {} } })), /both provider and providers/);
+    assert.throws(() => prepareUserConfig(options({ provider: { "ppq-private": {} } })), /ppq-private is managed/);
+    for (const raw of ['{"provider":{"__proto__":{}}}', '{"provider":{"fixture":{"options":{"constructor":{}}}}}']) {
+      assert.throws(() => prepareUserConfig({ opencode_config: raw }), /unsafe object key/);
+    }
+    for (const policy of [{ plugins: ["-homeassistant.runtime-guard"] }, { agents: {} }, { permissions: [] }]) {
+      assert.throws(() => prepareUserConfig(options({ provider: { fixture: {} }, ...policy })), /unsupported fields/);
+    }
+  });
+
   it("preserves native providers, aliases, overlays and variants using the pinned schema", () => {
     const provider = nativeProvider();
     provider.models.coding.variants = [{ id: "low", settings: { reasoningEffort: "low" }, body: { service_tier: "flex" } }];
@@ -82,7 +160,7 @@ describe("bounded native V2 provider configuration", () => {
   });
 
   for (const [label, config] of [
-    ["legacy provider", { provider: { fixture: {} } }],
+    ["malformed legacy provider", { provider: { fixture: null } }],
     ["legacy provider npm", { providers: { fixture: { npm: "@ai-sdk/openai-compatible" } } }],
     ["legacy provider options", { providers: { fixture: { options: { apiKey: fixtureKey } } } }],
     ["malformed nested model", { providers: { fixture: { models: { coding: { limit: { output: "100" } } } } } }],

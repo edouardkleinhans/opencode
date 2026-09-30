@@ -49,7 +49,12 @@ test("pinned V2 routes generated custom-provider and PPQ selections to controlle
     await writeFile(input, JSON.stringify({
       ppq_private_enabled: true, ppq_api_key: ppqKey,
       env_vars: [{ name: "FIXTURE_API_KEY", value: providerKey }, { name: "SUPERVISOR_TOKEN", value: "fixture-supervisor-not-forwarded" }],
-      opencode_config: JSON.stringify({ model: "fixture/coding", providers: { fixture: {
+      opencode_config: JSON.stringify({ model: "fixture/coding", provider: { legacy: {
+        npm: "@ai-sdk/openai-compatible", name: "Legacy local provider",
+        options: { baseURL: `http://127.0.0.1:${custom.address().port}/v1` },
+        models: { coding: { id: "upstream/legacy-coder", tool_call: true,
+          modalities: { input: ["text"], output: ["text"] }, limit: { context: 32000, output: 1000 } } },
+      } }, providers: { fixture: {
         name: "Local test fixture", env: ["FIXTURE_API_KEY"],
         package: "@opencode/ai/providers/openai-compatible",
         settings: { baseURL: `http://127.0.0.1:${custom.address().port}/v1` },
@@ -97,6 +102,8 @@ test("pinned V2 routes generated custom-provider and PPQ selections to controlle
     await run(); // The generated raw model default selects the custom provider.
     assert.ok(requests.some((entry) => entry.route === "custom" && entry.path === "/v1/chat/completions" && entry.body.model === "upstream/coder" && entry.authorization === `Bearer ${providerKey}`));
     assert.equal(requests.some((entry) => entry.route === "ppq"), false);
+    await run({ providerID: "legacy", id: "coding" });
+    assert.ok(requests.some((entry) => entry.route === "custom" && entry.path === "/v1/chat/completions" && entry.body.model === "upstream/legacy-coder"));
     await run({ providerID: "ppq-private", id: "private/kimi-k2-5" });
     assert.ok(requests.some((entry) => entry.route === "ppq" && entry.path === "/v1/chat/completions" && entry.body.model === "private/kimi-k2-5" && entry.authorization === "Bearer unused"));
     assert.ok(!logs.includes(providerKey), "provider API key must not appear in runtime logs");

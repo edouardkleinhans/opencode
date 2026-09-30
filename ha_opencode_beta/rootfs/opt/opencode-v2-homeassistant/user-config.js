@@ -82,6 +82,79 @@ function requestOptions(value) {
   if (value.package !== undefined && !PACKAGES.has(value.package)) invalid("provider/model package must be a documented built-in @opencode/ai/providers runtime; external packages are not supported");
 }
 
+// Convert only the legacy provider shapes whose meaning is unambiguous here.
+// The converted document still goes through the native schema and every managed
+// policy check below. Never load an npm package from a legacy configuration.
+function legacyRequest(options) {
+  if (options === undefined) return {};
+  object(options, "legacy provider/model options");
+  const { headers, body, ...settings } = options;
+  return {
+    settings,
+    ...(headers === undefined ? {} : { headers }),
+    ...(body === undefined ? {} : { body }),
+  };
+}
+
+function legacyModel(model) {
+  fields(model, ["id", "name", "family", "limit", "cost", "tool_call", "modalities", "options", "headers", "variants"], "legacy provider model (convert unsupported fields to native V2 explicitly)");
+  const { id, tool_call, modalities, options, variants, cost, headers, ...result } = model;
+  Object.assign(result, legacyRequest(options));
+  if (id !== undefined) result.modelID = id;
+  if (headers !== undefined) {
+    if (result.headers !== undefined) invalid("legacy model headers must be specified in only one place");
+    result.headers = headers;
+  }
+  if (tool_call !== undefined || modalities !== undefined) {
+    if (modalities !== undefined) fields(modalities, ["input", "output"], "legacy model modalities");
+    result.capabilities = { ...modalities, ...(tool_call === undefined ? {} : { tools: tool_call }) };
+  }
+  if (cost !== undefined) {
+    fields(cost, ["input", "output", "cache_read", "cache_write"], "legacy model cost");
+    const { cache_read, cache_write, ...pricing } = cost;
+    result.cost = { ...pricing, ...(cache_read === undefined && cache_write === undefined ? {} : {
+      cache: { ...(cache_read === undefined ? {} : { read: cache_read }), ...(cache_write === undefined ? {} : { write: cache_write }) },
+    }) };
+  }
+  if (variants !== undefined) {
+    object(variants, "legacy model variants");
+    result.variants = Object.entries(variants).map(([id, settings]) => {
+      object(settings, "legacy model variant");
+      if (Object.hasOwn(settings, "disabled")) invalid("legacy variant disabled flags require explicit native conversion");
+      return { id, ...legacyRequest(settings) };
+    });
+  }
+  return result;
+}
+
+function normalizeLegacyProviders(config, warn) {
+  if (config.provider === undefined) return;
+  object(config.provider, "legacy provider map");
+  if (config.providers !== undefined) object(config.providers, "providers");
+  const converted = Object.fromEntries(Object.entries(config.provider).map(([id, provider]) => {
+    if (Object.hasOwn(config.providers ?? {}, id)) invalid("a provider is defined in both provider and providers; keep only one definition");
+    fields(provider, ["name", "env", "npm", "api", "options", "models"], "legacy provider (convert unsupported fields to native V2 explicitly)");
+    const { npm, api, options, models, ...result } = provider;
+    Object.assign(result, legacyRequest(options));
+    if (npm !== undefined) {
+      if (npm !== "@ai-sdk/openai-compatible") invalid("automatic legacy npm conversion supports @ai-sdk/openai-compatible only; select a supported native package explicitly");
+      result.package = "@opencode/ai/providers/openai-compatible";
+    }
+    if (api !== undefined) {
+      if (result.settings?.baseURL !== undefined && result.settings.baseURL !== api) invalid("legacy api and options.baseURL disagree; keep one endpoint");
+      result.settings = { ...result.settings, baseURL: api };
+    }
+    if (models !== undefined) {
+      object(models, "legacy provider models");
+      result.models = Object.fromEntries(Object.entries(models).map(([key, value]) => [key, legacyModel(value)]));
+    }
+    return [id, result];
+  }));
+  config.providers = { ...converted, ...config.providers };
+  delete config.provider;
+  warn("Legacy provider configuration was converted to native V2 in memory; saved options are unchanged. Unsupported legacy fields still require explicit conversion.");
+}
+
 export function ppqProvider() {
   return {
     name: "PPQ Private (TEE)",
@@ -126,10 +199,11 @@ export function prepareUserConfig(options = {}, { warn = () => {} } = {}) {
   }
   object(config, "root");
   const legacyExternalMcp = extractLegacyExternalMcpConfig(config);
-  fields(config, ROOT_FIELDS, "root (managed plugins, permissions, agents, runtime and integration policy cannot be overridden)");
+  fields(config, [...ROOT_FIELDS, "provider"], "root (managed plugins, permissions, agents, runtime and integration policy cannot be overridden)");
   jsonValues(config, environment);
+  normalizeLegacyProviders(config, warn);
   try { decodeConfig(config); }
-  catch { invalid("native V2 schema validation failed; check field names and value types against /v2/docs/config and /v2/docs/providers (legacy provider/npm/options fields are not accepted)"); }
+  catch { invalid("native V2 schema validation failed; check field names and value types against /v2/docs/config and /v2/docs/providers (use npm/options only inside a supported legacy provider entry)"); }
   if (config.$schema !== undefined && config.$schema !== "https://opencode.ai/config.json") invalid("$schema must be https://opencode.ai/config.json");
   if (config.model !== undefined && (typeof config.model !== "string" || !/^[^\s/#]+\/[^\s#]+$/.test(config.model))) invalid("model must be a provider/model string without a variant");
   if (config.default_agent !== undefined && !["build", "plan", "home-assistant-read-only"].includes(config.default_agent)) invalid("default_agent must be build, plan, or home-assistant-read-only");

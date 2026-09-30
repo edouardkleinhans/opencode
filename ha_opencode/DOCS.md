@@ -44,6 +44,18 @@ The former browser-terminal quit overlay is not included in V2; use the terminal
 own exit action. OpenChamber uses a pinned upstream V2 preview. PPQ account-backed
 private inference has not completed live qualification.
 
+### Startup and history troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| Custom configuration could not be prepared; sidecar inactive | Read the first `opencode_config` or `external_mcp_config` error. Correct that option and restart; the sidecar waits for successful configuration staging. Reinstalling is not required. |
+| `opencode-container-init` rejects `/homeassistant` | The failure is before migration. The log now identifies a missing mount, a symlink/file, or the observed versus required numeric UID/GID. Include that metadata and your installation type in the report; do not recursively change configuration ownership. |
+| Migrated sessions appear missing | In the TUI session picker, Ctrl+A switches to all projects; Ctrl+O can search across locations. The pinned picker lists at most 50 root sessions and does not paginate or list child sessions. This is a browsing limitation, not evidence of lost history. |
+
+Custom agents in project `.opencode/agents` directories are not loaded by this
+managed runtime. A persistent importer with constrained permissions remains a
+follow-up; use the built-in Home Assistant Read Only agent for supported audits.
+
 Stable and beta can run side by side. They share Home Assistant configuration
 files and `AGENTS.local.md`, but keep separate app data and decision notes. Stable
 owns the managed `/config/AGENTS.md`. Give each app different host ports if you
@@ -176,6 +188,16 @@ Opening OpenChamber through Ingress does not attach that desktop browser. The
 packaged Chromium used by the optional HA `screenshot_url` tool is a separate
 capability. Desktop-browser attachment to the app's managed server is not
 yet qualified; do not expose a Chromium debugging port as a workaround.
+
+### Pasting dashboard screenshots
+
+In **OpenChamber**, paste an image into the chat composer with Ctrl+V (Cmd+V on
+macOS), or choose **Add attachment → Attach files** and select a saved screenshot.
+Confirm that an attachment preview appears and choose a model that accepts images.
+If pasting fails, report your browser/device, interface mode and whether file
+attachment works. The **browser terminal** currently supports text paste only;
+it does not transport clipboard images into the remote TUI. The optional HA
+screenshot tool captures a page separately and does not enable image paste.
 
 ## Home Assistant Skills
 
@@ -545,6 +567,10 @@ credential settings, not a URL or command argument. The app's internal backend
 credential is never distributed. Browser preflight does not authorize API calls;
 every actual API request still needs authentication.
 
+Compatible V2 clients use `/api/info` for server health. A client requesting
+`/global/health` needs its exact build/protocol checked: allowing that path alone
+would return the backend's HTML fallback, not a V2 health response.
+
 Save options and **restart the app** to activate or rotate LAN credentials. Invalid
 enabled-LAN settings fail managed activation with an option-specific error. If
 upgrading with an old enabled LAN option, configure these required settings or
@@ -557,6 +583,18 @@ Set `interface_mode: openchamber`, enable `enable_openchamber_lan`, and configur
 `openchamber_public_url` plus the shared LAN password/proxy settings above. Point
 your HTTPS proxy at mapped `4097/tcp`. Sign in using OpenChamber's native password
 screen; enabling this mode also requires that login through HA Ingress.
+
+To use the OpenChamber desktop or mobile app instead of a browser, also enable
+`openchamber_lan_native_apps`, then add the server in the app using
+`openchamber_public_url`. The app signs in from outside the page, so the strict
+same-origin rule would otherwise refuse it. This option additionally accepts
+requests without an `Origin` header, as used by the desktop login process,
+and OpenChamber's packaged app origins `openchamber-ui://app`,
+`capacitor://localhost` and `https://localhost`, and passes through the CORS
+headers OpenChamber returns for them. Other origins remain refused, and the
+native password or paired-client token is still required. It has no effect on
+the API frontend. The desktop app's "Home network only" pairing stays
+unavailable because OpenChamber listens on loopback inside the app.
 
 Native UI sessions and paired-client tokens are scoped to one app activation.
 Every app restart, including a password change, invalidates them and closes
@@ -601,13 +639,24 @@ the Supervisor token. The MCP tool retains its execution deadline and cancellati
 
 ## Custom Providers and Configuration (Beta)
 
-The **Custom OpenCode configuration** option accepts a JSON object, not JSONC or
-V1 provider syntax. Supported root fields are `$schema`, `model`, `default_agent`,
+The **Custom OpenCode configuration** option accepts a JSON object, not JSONC.
+Supported native root fields are `$schema`, `model`, `default_agent`,
 `providers`, boolean `formatter`, `compaction`, `media`, `tool_output` and `websearch`.
 Nested settings are checked against the pinned native V2 schema. Unsupported
 fields and invalid values stop V2 activation for that boot, preserving the saved
 options for correction. Managed permissions, agents, plugins, snapshots, LSP,
 runtime selection and integration policy cannot be overridden here.
+
+Supported legacy `provider` entries are converted in memory at startup, without
+rewriting saved options: `npm: "@ai-sdk/openai-compatible"` uses the built-in V2
+compatible runtime, `options` becomes `settings` (with `headers` and `body`
+separated), and `api` becomes `settings.baseURL`. Model `id`, `tool_call`,
+`modalities`, token limits, cache pricing and variant maps are retained in their
+V2 forms. Built-in provider overlays may omit `npm`. Other legacy packages or
+unsupported model fields require explicit native conversion; no arbitrary npm
+code is loaded. Keep each entry entirely legacy or native, and do not define the
+same provider in both maps. The converted result must pass all native schema,
+credential and managed-policy checks.
 
 For example, configure `CUSTOM_API_KEY` privately in **Environment variables**,
 then paste this JSON into **Custom OpenCode configuration**, replacing the example
@@ -654,8 +703,9 @@ External tools default to `ask`; later permission entries override that default.
 
 During a 2.x upgrade, compatible legacy `mcp` and `permission` fields in the
 add-on's `opencode_config` option are read automatically. Project-level files
-such as `/homeassistant/opencode.json`, old sessions and provider authentication
-are not imported. To migrate those servers, copy each supported definition into
+such as `/homeassistant/opencode.json` are not imported by this MCP option.
+Conversation history has its own validated migration; V1 provider credentials
+are not imported. To migrate project-defined servers, copy each supported definition into
 **External MCP configuration**, move credential values to the MCP secrets
 directory, and replace local `sh -c` wrappers with direct executable commands.
 Reconnect provider accounts separately. After activation, move any automatically

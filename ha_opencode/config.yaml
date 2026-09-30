@@ -130,6 +130,8 @@ options:
   openchamber_public_url: ""
   # Additional exact HTTPS browser origins for the API frontend.
   cors_origins: []
+  # Let OpenChamber desktop/mobile apps sign in to the OpenChamber LAN UI.
+  openchamber_lan_native_apps: false
 
   # --- 6. Model providers ------------------------------------------------
   # Starts the internal PPQ proxy and registers native ppq-private models when
@@ -156,7 +158,7 @@ options:
   # Backend forwarding supports non-reserved provider *_API_KEY variables only.
   # Other variables retain separate shell/service handling, with a warning.
   env_vars: []
-  # Validated native V2 JSON subset; invalid/unsupported fields stop activation.
+  # Validated V2 subset with bounded legacy provider conversion; invalid fields stop activation.
   opencode_config: ""
   # Bounded external MCP definitions and their ordered tool permissions.
   external_mcp_config: ""
@@ -203,6 +205,7 @@ schema:
   openchamber_public_url: str?
   cors_origins:
     - str
+  openchamber_lan_native_apps: bool?
 
   # --- 6. Model providers ------------------------------------------------
   ppq_private_enabled: bool

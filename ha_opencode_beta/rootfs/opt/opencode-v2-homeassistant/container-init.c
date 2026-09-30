@@ -14,7 +14,7 @@
 
 extern char **environ;
 
-static void fail(const char *message) {
+static _Noreturn void fail(const char *message) {
   dprintf(STDERR_FILENO, "opencode-container-init: %s: %s\n", message,
           strerror(errno));
   _exit(126);
@@ -22,10 +22,23 @@ static void fail(const char *message) {
 
 static void require_directory(const char *path, uid_t uid, gid_t gid) {
   struct stat info;
-  if (lstat(path, &info) != 0 || !S_ISDIR(info.st_mode) ||
-      info.st_uid != uid || info.st_gid != gid) {
-    errno = EINVAL;
-    fail("required directory has an unsafe identity");
+  if (lstat(path, &info) != 0) {
+    dprintf(STDERR_FILENO, "opencode-container-init: cannot inspect %s: %s\n",
+            path, strerror(errno));
+    _exit(126);
+  }
+  if (!S_ISDIR(info.st_mode)) {
+    dprintf(STDERR_FILENO,
+            "opencode-container-init: %s must be a real directory, not a symlink or file; check the Home Assistant configuration mount\n",
+            path);
+    _exit(126);
+  }
+  if (info.st_uid != uid || info.st_gid != gid) {
+    dprintf(STDERR_FILENO,
+            "opencode-container-init: %s has uid=%lu gid=%lu; expected uid=%lu gid=%lu; check the Home Assistant configuration mount ownership (no files were changed)\n",
+            path, (unsigned long)info.st_uid, (unsigned long)info.st_gid,
+            (unsigned long)uid, (unsigned long)gid);
+    _exit(126);
   }
 }
 

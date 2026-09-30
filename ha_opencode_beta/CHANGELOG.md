@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Restore supported V1 OpenAI-compatible provider settings through validated, in-memory V2 conversion; thanks @nomonkeynodeal for reporting [#141](https://github.com/magnusoverli/opencode/issues/141).
+- Explain configuration failures directly in the terminal before the resulting sidecar warning; thanks @smw6180, @Sebazzz and @MechaMtt for reporting [#139](https://github.com/magnusoverli/opencode/issues/139).
+- Add opt-in `openchamber_lan_native_apps` for native OpenChamber login through the HTTPS LAN frontend, with authenticated token/CORS/stream coverage; thanks @Rahulsharma0810 for reporting [#135](https://github.com/magnusoverli/opencode/issues/135) and contributing [#136](https://github.com/magnusoverli/opencode/pull/136).
+- Identify the exact `/homeassistant` mount/ownership failure at pre-init without changing files; thanks @arretx and @bbo76 for reporting [#138](https://github.com/magnusoverli/opencode/issues/138), whose underlying mount issue still needs affected-host evidence.
+- Clarify MCP migration, history-picker limits, custom-agent availability, V2 client health and screenshot paste; thanks @horve000, @BBungalow, @SolutechUK, @naspinec and @AngeloAna for the reports ([#129](https://github.com/magnusoverli/opencode/issues/129), [#134](https://github.com/magnusoverli/opencode/issues/134), [#140](https://github.com/magnusoverli/opencode/issues/140), [#142](https://github.com/magnusoverli/opencode/issues/142), [#143](https://github.com/magnusoverli/opencode/issues/143)); remaining implementation/design questions stay open.
+
 - Restore device and entity room assignments in OpenChamber via approved Home Assistant registry tools in the full profile ([#132](https://github.com/magnusoverli/opencode/issues/132)).
 - Add a bounded `external_mcp_config` option for remote and local MCP servers. Credentials stay in secured root-owned files, local processes run unprivileged with only their declared environment, external tools default to confirmation, and optional ordered tool rules are translated to native V2 permissions.
 
