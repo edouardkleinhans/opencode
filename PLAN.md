@@ -9,13 +9,14 @@ the remaining list current instead of accumulating historical plans.
 - User direction: begin implementation for a new beta **based on current stable**.
   Baseline: stable **3.1.0**, `b9ea92f`, released 2026-09-30. Work in
   `ha_opencode_beta`; preserve its slug, image, app data and decision-note paths.
-- Release target authorized by the user: **3.2.0b0**, an experimental first beta
-  with the limits below documented. `config.yaml` continues advertising
-  the last published beta until the release workflow publishes the new image.
+- Published **3.2.0b0**, an experimental first beta with the limits below
+  documented, at `beta-v3.2.0b0` / `d48ac91740b510d9c70e997fd30910865a198c63`.
+  Release workflow `36926495259` passed; storefront commit `24fa5b8` advertises
+  beta `3.2.0b0`. Stable remains `3.1.0`.
   CLI/plugin stay at stable's **2.0.13**; OpenChamber stays at the stable pin.
 - Source contract: HA **2026.10.0b0** (`64ed916d9c22640b8d41b403fda0f7ed4d4c0bd5`).
   `llm/api/list` also exists in 2026.9; endpoint probes retain older-HA support.
-- Implemented locally: stable runtime/test baseline adoption; read-only registered
+- Implemented: stable runtime/test baseline adoption; read-only registered
   API discovery via Supervisor WebSocket; saved-ID diagnostics in the capability
   tool/resource; separate registry versus endpoint evidence; updated native-LLM
   guide and access-model documentation. Discovery does not mutate selection.
@@ -29,7 +30,7 @@ the remaining list current instead of accumulating historical plans.
   and HTTP listener; existing boundary tests cover those separately.
   Bridge tests additionally cover snapshot reads/refresh, cancellation, custom
   prompt names, metadata and older servers without prompt/resource capabilities.
-- Native companion implemented locally in `custom_components/opencode_assist`:
+- Native companion in `custom_components/opencode_assist`:
   versioned config/reauth/reconfigure and subentry flows, dynamic HA API/model
   choices (no API selected by default), ConversationEntity, text/validated-JSON
   AI Task entity, unload/removal cleanup and redacted diagnostics. Enable the
@@ -53,8 +54,9 @@ the remaining list current instead of accumulating historical plans.
 - Beta release preparation includes a deterministic `opencode-assist.zip` asset;
   the tag/storefront guard also checks the companion and packaging script. The
   release workflow publishes it only when a reviewed beta tag is pushed.
-  Local archive: `/tmp/opencode/opencode-assist.zip`, companion **0.1.0b1**;
-  SHA256 `8250d791b8485a808a07b39642a80749c2602596d4cc67f932a687b2d44778c4`.
+  Published companion **0.1.0b1**: release asset `opencode-assist.zip` matches
+  the deterministic local package byte-for-byte; SHA256
+  `e7ea4aa86aa9450d56484493bd269165ba5bfc6a866ec8d11a247d1d87c2bf1e`.
 - Native **amd64 boundary-test image passed** with Node **24.15.0** and OpenCode
   **2.0.13**, including all four Assist adapter/pairing tests, the existing native
   credential/policy/provider/LAN/Zigbee boundary checks and forward migration.
@@ -79,9 +81,22 @@ the remaining list current instead of accumulating historical plans.
   main `611ee9f`, retaining stable 3.1.0 pins and adopting main's reviewed
   brace-expansion security fix. Pre-existing contributor/Lemonade documentation
   edits remain in the original worktree.
-- [ ] Pass review-branch CI and native amd64/arm64 image checks; merge the scoped
-  change, build/publish both final images, then push `beta-v3.2.0b0` and verify
-  the release, companion asset, image manifest and Supervisor storefront.
+- PR **#148** merged after all eight checks passed: PR contracts `36924516475`
+  and native amd64/arm64 boundary checks `36924516462`. Main contracts
+  `36925216725` and native checks `36925216618` also passed.
+- Both native final images and the multi-architecture manifest were published by
+  workflow `36925231523` **before** pushing the release tag. Registry inspection
+  confirmed `linux/amd64` and `linux/arm64`; publication and companion download
+  succeeded, and the only storefront diff from the tag is the beta version.
+- Tag-triggered build/publication `36926495368` passed both native boundaries
+  and final builds. The release includes `container-images.md`,
+  `image-manifest.txt` and `opencode-assist.zip`; the manifest asset agrees with
+  the final registry index
+  `sha256:3935c453b6bd15d5a26c2a3cd2f3c018fd14242f372afdb584968a19f72d5537`.
+  Platform manifests: amd64
+  `sha256:bdfa1034828fa185510a609a303cbc725d5e58106d8434c3d7cc1bac084afb5e`;
+  arm64 `sha256:a794a4ab289c32c982f173b36ec53e18e6e90e04ddaf1b2720795c170c035a13`.
+  Release: https://github.com/magnusoverli/opencode/releases/tag/beta-v3.2.0b0.
 
 The user authorized publication as an experimental beta. The following remain
 explicit qualification/follow-up work, rather than claims of completed support:
