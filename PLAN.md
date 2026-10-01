@@ -1,8 +1,114 @@
-# OpenCode V2: stable 3.0 release record
+# OpenCode: implementation and release plan
 
-Updated: 2026-09-23. This is the single shared plan for this work, tracked in Git.
+Updated: 2026-10-01. This is the single shared plan for this work, tracked in Git.
 Only open tasks appear as checkboxes; close them with concrete evidence and keep
 the remaining list current instead of accumulating historical plans.
+
+## HA native integration beta — issue #45
+
+- User direction: begin implementation for a new beta **based on current stable**.
+  Baseline: stable **3.1.0**, `b9ea92f`, released 2026-09-30. Work in
+  `ha_opencode_beta`; preserve its slug, image, app data and decision-note paths.
+- Release target authorized by the user: **3.2.0b0**, an experimental first beta
+  with the limits below documented. `config.yaml` continues advertising
+  the last published beta until the release workflow publishes the new image.
+  CLI/plugin stay at stable's **2.0.13**; OpenChamber stays at the stable pin.
+- Source contract: HA **2026.10.0b0** (`64ed916d9c22640b8d41b403fda0f7ed4d4c0bd5`).
+  `llm/api/list` also exists in 2026.9; endpoint probes retain older-HA support.
+- Implemented locally: stable runtime/test baseline adoption; read-only registered
+  API discovery via Supervisor WebSocket; saved-ID diagnostics in the capability
+  tool/resource; separate registry versus endpoint evidence; updated native-LLM
+  guide and access-model documentation. Discovery does not mutate selection.
+- Native context integration: initialization guidance preserves HA instructions;
+  prompts/resources stay on demand. Schema compatibility repair is limited to
+  legacy unprefixed GetLiveContext, preserving modern/custom schemas and metadata.
+  A real pinned 2.0.13 process exercises production MCP registration and forwarding
+  against synthetic HA/provider fixtures: prompt command consumption, resource
+  discovery, fresh context tool results, required fields, errors and the managed
+  read-only agent's deny policy. The fixture substitutes the FFI credential broker
+  and HTTP listener; existing boundary tests cover those separately.
+  Bridge tests additionally cover snapshot reads/refresh, cancellation, custom
+  prompt names, metadata and older servers without prompt/resource capabilities.
+- Native companion implemented locally in `custom_components/opencode_assist`:
+  versioned config/reauth/reconfigure and subentry flows, dynamic HA API/model
+  choices (no API selected by default), ConversationEntity, text/validated-JSON
+  AI Task entity, unload/removal cleanup and redacted diagnostics. Enable the
+  beta's `ha_assist_enabled` option and pair via administrator-only Ingress.
+- Pinned 2.0.13 adapter proof: request-specific tool registration and history,
+  streaming, exact arguments (including schema patterns), concurrent conversation
+  isolation, cross-request result rejection, revocation and cancellation. The
+  scoped HTTP facade rejects administrative paths, caller agent overrides and
+  file-bearing history. Pairing credentials are digest-only in a separate store;
+  ordinary cleanup removes the disposable session. A crash can leave an orphaned
+  session; the private agent fails closed without an active request, and no
+  secure-erasure claim is made for underlying databases/provider logs.
+- Official HA **2026.10.0b0** image (`sha256:8d51a81b654093b81d90501d7f8969f634e2f77e6fc5f1cbe52031f8e2726fd9`):
+  **6 contract tests passed**, using actual ChatLog, LLMContext, config-flow and
+  AI Task classes. `node scripts/test-ha-assist-core.mjs` additionally joins the
+  real pinned OpenCode process to HA's HTTP client/ChatLog: original caller
+  context reaches HA tools, follow-up tool history survives, and client shutdown
+  cancels pending HA tool execution. HTTP/provider fixtures replace real devices
+  and model accounts; this is not supervised installation/voice-pipeline evidence.
+  PR CI runs this suite; native image CI includes the adapter/pairing fixtures.
+- Beta release preparation includes a deterministic `opencode-assist.zip` asset;
+  the tag/storefront guard also checks the companion and packaging script. The
+  release workflow publishes it only when a reviewed beta tag is pushed.
+  Local archive: `/tmp/opencode/opencode-assist.zip`, companion **0.1.0b1**;
+  SHA256 `8250d791b8485a808a07b39642a80749c2602596d4cc67f932a687b2d44778c4`.
+- Native **amd64 boundary-test image passed** with Node **24.15.0** and OpenCode
+  **2.0.13**, including all four Assist adapter/pairing tests, the existing native
+  credential/policy/provider/LAN/Zigbee boundary checks and forward migration.
+  Local test image `opencode-beta:ha-assist-local`, image config
+  `sha256:13efe92f3bdb691f35da4cba50c72d1604cf45676301404ad0cafd99f14e767f`.
+  This is a boundary-test build, not a published final image or supervised run.
+  The host initially lacked Buildx; a checksum-verified **0.37.2** client under
+  `/tmp/opencode/ha-build-docker` enabled the successful BuildKit build.
+- Local verification (Linux, Node 24.21.0): MCP suite **642 passed / 4 skipped**;
+  beta runtime contracts **262 passed / 3 skipped** in the clean release worktree;
+  HA-facing discovery/lifecycle
+  **19 passed**. Skips require browser/editor dependencies or root-only fixtures.
+  Channel separation **10 passed**; beta startup-hook security, per-channel option
+  declarations, CLI/plugin pin verification and diff whitespace checks passed.
+  All three generated Python starters parse (syntax only). Controlled HTTP/WS
+  fixtures exercise the shipped MCP process; these host suites are not live HA
+  evidence. The separate amd64 image evidence above uses the exact Node pin.
+
+### Release execution and remaining qualification
+
+- Release preparation uses a separate `release/3.2.0b0` worktree based on current
+  main `611ee9f`, retaining stable 3.1.0 pins and adopting main's reviewed
+  brace-expansion security fix. Pre-existing contributor/Lemonade documentation
+  edits remain in the original worktree.
+- [ ] Pass review-branch CI and native amd64/arm64 image checks; merge the scoped
+  change, build/publish both final images, then push `beta-v3.2.0b0` and verify
+  the release, companion asset, image manifest and Supervisor storefront.
+
+The user authorized publication as an experimental beta. The following remain
+explicit qualification/follow-up work, rather than claims of completed support:
+
+- [ ] Qualify both MCP directions on real HA 2026.10: discovery/confirmation,
+  authentication/reauthentication, restart/removal, stable+beta coexistence,
+  selected native catalog and a bounded read-only call. Record exact versions.
+- [ ] Qualify UI resource reading on the shipped clients; the pinned-runtime model
+  path currently uses the native live-context tool, with resource discovery tested.
+  Inspection of the built pinned OpenChamber UI source found only an
+  `mcp.resources.changed` event handler and no resource-read/list invocation; a
+  rendered-resource workflow is not yet established for this client pin.
+- [ ] Expose discovered API choices in setup UI; keep Supervisor options as the
+  supported saved configuration, with no silent change to broader APIs.
+- [ ] Qualify companion installation/config/subentry/reauth/reconfigure/removal
+  flows through a real supervised HA UI, then an Assist pipeline and AI Task
+  service with a compatible account-backed model. Verify caller/exposure behavior
+  for the built-in Assist API; selected custom APIs retain their own boundaries.
+- [ ] Qualify restart/crash recovery, inspect temporary-session retention and
+  decide whether a narrowly marked orphan cleanup is needed. The first
+  experimental release documents this limitation with the adapter disabled by default.
+- [ ] Requalify the separately installed companion against the final HA 2026.10
+  release and test installation from the packaged beta ZIP.
+- [ ] Complete supervised release acceptance before claiming fully qualified
+  native integration support. Native image checks/publication are tracked above.
+
+The sections below preserve the earlier stable-release record.
 
 ## Stable 3.0.0 promotion — 2026-09-23
 

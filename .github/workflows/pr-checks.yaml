@@ -38,6 +38,10 @@ jobs:
         working-directory: ha_opencode_beta/rootfs/opt/opencode-v2-homeassistant
         run: npm run verify:versions
 
+      - name: Install beta MCP dependencies for the shared Assist authentication boundary
+        working-directory: ha_opencode_beta/rootfs/opt/ha-mcp-server
+        run: npm install --ignore-scripts --no-audit --no-fund
+
       - name: Prepare isolated editor contract dependencies
         run: |
           editor_deps="${RUNNER_TEMP}/ha-editor-contracts"
@@ -83,6 +87,23 @@ jobs:
           bash scripts/test-channel-separation.sh
           bash scripts/test-startup-hooks.sh stable
           bash scripts/test-startup-hooks.sh beta
+
+  ha-assist:
+    name: HA 2026.10 companion and pinned OpenCode contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.15.0
+      - name: Install pinned OpenCode runtime
+        working-directory: ha_opencode_beta/rootfs/opt/opencode-v2-homeassistant
+        run: npm ci --no-audit --no-fund
+      - name: Exercise actual HA ChatLog and companion contracts
+        run: node scripts/test-ha-assist-core.mjs
+      - name: Verify companion packaging
+        run: python3 scripts/package-ha-assist.py "${RUNNER_TEMP}/opencode-assist.zip"
 
   mcp-server:
     name: Home Assistant MCP server (${{ matrix.channel }})

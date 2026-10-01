@@ -44,8 +44,10 @@ built-in Assist API is `/api/mcp/assist`.
 - `get_ha_llm_development_guide` returns the upstream references and a starter
   template for writing an `llm.py` provider. Use it before writing one.
 - `get_agent_capabilities` (or the `ha://agent/capabilities` resource) reports
-  whether the running instance actually has the native `llm` component and which
-  native MCP endpoints answer.
+  whether the running instance actually has the native `llm` component, the
+  registered API IDs/names from `llm/api/list` (2026.9+), the saved API selection,
+  and which native MCP endpoints answer. Registration, endpoint initialization,
+  and successful tool execution are separate checks. Discovery is read-only.
 - This add-on **cannot** register tools with Home Assistant's `llm` platform.
   Registration is internal to integrations and custom integrations. What the
   add-on can do is *consume* a configured native LLM API over native MCP, which
@@ -55,6 +57,32 @@ built-in Assist API is `/api/mcp/assist`.
   configuration editing, safe writes, validation, admin and development
   workflows, screenshots, updates, ESPHome, `hab`, Zigbee, and documentation
   lookup.
+- The generated starter code targets **2026.10.0b0**: `probatio.Schema`,
+  `ToolResult`, `integration`, `ToolAnnotations`, and domain-prefixed tool names.
+  Use the matching release's source when supporting 2026.8/2026.9.
+- New 2026.10 MCP Server entries expose all LLM APIs and require admin by default.
+  That selection governs `/api/mcp`, not the individually keyed endpoints.
+  Prefer `assist` for ordinary home control; a native rejection is not permission
+  to retry through the add-on's broader administrative tools.
+- Native MCP prompts are exposed as OpenCode commands (for example
+  `/homeassistant_native:Assist`); discover the name for a custom/combined API.
+  Read current context through the selected API's discovered native tool. MCP
+  resource clients can also use `homeassistant://assist/context-snapshot` when
+  advertised. Neither a retrieved prompt nor a snapshot stays current forever.
+  Required arguments, titles, annotations and `isError` pass through the bridge;
+  annotations do not override tool permissions. Legacy schema repair applies only
+  to unprefixed `GetLiveContext`, not custom or modern schemas.
+
+## OpenCode Assist companion (experimental beta)
+
+The optional `opencode_assist` custom integration exposes OpenCode as a native
+conversation agent and AI data-task entity on HA 2026.10. It is installed
+separately; the app's `ha_assist_enabled` option enables its scoped adapter and
+administrator-only `/ha-assist/` Ingress pairing page. HA owns ChatLog, caller
+context, selected APIs and tool execution. API choices default to none. Never
+replace a denied HA tool call with the app's broader coding or administrative
+tools. Pairing revocation cancels pending requests; attachments and image
+generation are not supported. See the repository companion README for setup.
 
 ## Home Assistant add-ons
 

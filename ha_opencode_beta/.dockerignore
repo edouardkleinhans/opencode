@@ -20,6 +20,10 @@ rootfs/opt/*/README.md
 !test/v2-provider-startup-fixture.mjs
 !test/v2-zigbee-fixture.mjs
 !test/v2-lan-fixture.mjs
+!test/opencode-v2-assist-adapter.test.js
+!test/opencode-v2-assist-service.test.js
+!test/helpers/
+!test/helpers/assist-fixture.mjs
 !test/v2-ui-lan-fixture.mjs
 !test/v2-forward-fixture.py
 !test/openchamber-request-body.mjs

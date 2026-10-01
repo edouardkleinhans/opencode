@@ -46,7 +46,8 @@ describe("Home Assistant LLM development guide", () => {
     const guide = buildHaLlmDevelopmentGuide();
 
     expect(guide).toContain("async_should_expose");
-    expect(guide).toContain("IntentTool(handler.intent_type, handler)");
+    expect(guide).toContain('f"{DOMAIN}__{handler.intent_type}"');
+    expect(guide).toContain("integration=DOMAIN");
     expect(guide).toContain("if api_id != LLM_API_ASSIST");
     expect(guide).toContain("No manifest change is needed");
   });
@@ -65,5 +66,12 @@ describe("Home Assistant LLM development guide", () => {
     expect(guide).toContain("async_render_no_api_prompt");
     expect(guide).toContain("home-assistant/core#176082");
     expect(guide).toContain("LLMContext.assistant");
+    expect(guide).toContain("Home Assistant 2026.10.0b0");
+    expect(guide).toContain("import probatio");
+    expect(guide).toContain("parameters = probatio.Schema");
+    expect(guide).toContain("return ToolResult(data=result)");
+    expect(guide).toContain("read_only=True, destructive=False");
+    expect(guide).toContain('name = "example_domain__example_status"');
+    expect(guide).toContain("llm/api/list");
   });
 });

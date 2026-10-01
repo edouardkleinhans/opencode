@@ -760,9 +760,10 @@ describe("openchamber ingress proxy: disconnected clients", () => {
 });
 
 describe("openchamber ingress proxy: release parity", () => {
-  it("keeps stable and beta V2 forwarding identical", () => {
+  it("keeps forwarding identical except for the beta-only Assist upgrade block", () => {
     const stable = fs.readFileSync(STABLE_PROXY_SCRIPT, "utf8");
     const beta = fs.readFileSync(path.join(__dirname, "..", "..", "ha_opencode_beta", "rootfs", "usr", "local", "bin", "openchamber-ingress-proxy.js"), "utf8");
-    assert.equal(beta, stable);
+    assert.ok(beta.includes("/^\\/ha-(?:mcp|assist)(?:[/?]|$)/"));
+    assert.equal(beta.replace("/^\\/ha-(?:mcp|assist)(?:[/?]|$)/", "/^\\/ha-mcp(?:[/?]|$)/"), stable);
   });
 });

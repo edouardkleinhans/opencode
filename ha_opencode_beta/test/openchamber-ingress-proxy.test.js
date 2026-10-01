@@ -432,6 +432,120 @@ describe("openchamber ingress proxy: provider OAuth loopback bridge", () => {
   });
 });
 
+describe("openchamber ingress proxy: V2 OpenAI browser sign-in", () => {
+  let proxy;
+  let upstream;
+  let listener;
+  let proxyPort;
+  let upstreamPort;
+  let callbackPort;
+  const hits = [];
+  const state = "V2-STATE";
+
+  before(async () => {
+    for (const port of [1455, 1457]) {
+      const candidate = http.createServer((req, res) => {
+        hits.push(new URL(req.url, `http://localhost:${port}`));
+        res.writeHead(200);
+        res.end("ok");
+      });
+      try {
+        await listen(candidate, port);
+        listener = candidate;
+        callbackPort = port;
+        break;
+      } catch (error) {
+        if (error.code !== "EADDRINUSE") throw error;
+      }
+    }
+    if (!listener) return;
+
+    upstream = http.createServer((req, res) => {
+      const url = new URL(req.url, "http://localhost");
+      if (url.pathname === "/api/integration/openai/connect/oauth") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ data: {
+          attemptID: "test-attempt", mode: "auto",
+          url: `https://auth.openai.com/oauth/authorize?redirect_uri=${encodeURIComponent(`http://localhost:${callbackPort}/auth/callback`)}&state=${state}`,
+          instructions: "This window will close automatically.",
+        } }));
+        return;
+      }
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ data: { status: hits.length ? "complete" : "pending" } }));
+    });
+    upstreamPort = await freePort();
+    await listen(upstream, upstreamPort);
+    proxyPort = await freePort();
+    proxy = spawn(process.execPath, [PROXY_SCRIPT], {
+      env: { ...process.env, OPENCHAMBER_INGRESS_HOST: "127.0.0.1", OPENCHAMBER_INGRESS_PORT: String(proxyPort),
+        OPENCHAMBER_UPSTREAM_HOST: "127.0.0.1", OPENCHAMBER_UPSTREAM_PORT: String(upstreamPort) },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    proxy.stderr.resume();
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("proxy did not start")), 10000);
+      proxy.stdout.on("data", (chunk) => {
+        if (String(chunk).includes("listening")) { clearTimeout(timer); resolve(); }
+      });
+      proxy.once("error", reject);
+    });
+    proxy.stdout.resume();
+  });
+
+  after(async () => {
+    if (proxy) proxy.kill();
+    await close(upstream);
+    await close(listener);
+  });
+
+  it("hands the browser flow off to a same-origin page, validates state and completes polling", async (t) => {
+    if (!listener) { t.skip("OpenAI callback ports 1455 and 1457 are occupied"); return; }
+    const connectBody = JSON.stringify({ methodID: "chatgpt-browser" });
+    const connected = await request(proxyPort, {
+      method: "POST", path: `${INGRESS_PATH}/api/integration/openai/connect/oauth`,
+      headers: { "content-type": "application/json", "content-length": Buffer.byteLength(connectBody),
+        origin: `http://127.0.0.1:${proxyPort}`, host: `127.0.0.1:${upstreamPort}`,
+        "x-ingress-path": INGRESS_PATH },
+    }, connectBody);
+    assert.equal(connected.statusCode, 200);
+    const attempt = JSON.parse(connected.body).data;
+    assert.equal(attempt.mode, "auto");
+    assert.equal(attempt.attemptID, "test-attempt");
+    const handoffUrl = new URL(attempt.url);
+    assert.equal(handoffUrl.origin, `http://127.0.0.1:${proxyPort}`);
+    assert.equal(handoffUrl.pathname, `${INGRESS_PATH}/__ha_openai_oauth_bridge`);
+    const handoff = await request(proxyPort, { path: handoffUrl.pathname + handoffUrl.search });
+    assert.equal(handoff.statusCode, 200);
+    assert.match(handoff.body, /Continue to OpenAI sign-in/);
+    assert.match(handoff.body, /auth\.openai\.com/);
+    assert.doesNotMatch(handoff.body, /test-attempt/);
+
+    const submit = (callback) => {
+      const body = new URLSearchParams({ callback }).toString();
+      return request(proxyPort, {
+        method: "POST", path: handoffUrl.pathname + handoffUrl.search,
+        headers: { "content-type": "application/x-www-form-urlencoded", "content-length": Buffer.byteLength(body) },
+      }, body);
+    };
+    const wrong = await submit(`http://localhost:${callbackPort}/auth/callback?code=WRONG&state=OTHER`);
+    assert.equal(wrong.statusCode, 400);
+    assert.equal(hits.length, 0);
+    const wrongOrigin = await submit(`http://127.0.0.1:${callbackPort}/auth/callback?code=WRONG&state=${state}`);
+    assert.equal(wrongOrigin.statusCode, 400);
+    assert.equal(hits.length, 0);
+    const completed = await submit(`http://localhost:${callbackPort}/auth/callback?code=TEST-CODE&state=${state}`);
+    assert.equal(completed.statusCode, 200);
+    assert.equal(hits.length, 1);
+    assert.equal(hits[0].searchParams.get("code"), "TEST-CODE");
+    assert.equal(hits[0].searchParams.get("state"), state);
+    assert.doesNotMatch(completed.body, /TEST-CODE/);
+    const status = await request(proxyPort, { path: `${INGRESS_PATH}/api/integration/openai/connect/oauth/test-attempt` });
+    assert.equal(JSON.parse(status.body).data.status, "complete");
+    assert.equal((await request(proxyPort, { path: handoffUrl.pathname + handoffUrl.search })).statusCode, 404);
+  });
+});
+
 describe("openchamber ingress proxy: remote allowlist", () => {
   let proxy;
   let proxyPort;
@@ -646,9 +760,10 @@ describe("openchamber ingress proxy: disconnected clients", () => {
 });
 
 describe("openchamber ingress proxy: release parity", () => {
-  it("keeps stable and beta V2 forwarding identical", () => {
+  it("keeps forwarding identical except for the beta-only Assist upgrade block", () => {
     const stable = fs.readFileSync(STABLE_PROXY_SCRIPT, "utf8");
     const beta = fs.readFileSync(PROXY_SCRIPT, "utf8");
-    assert.equal(beta, stable);
+    assert.ok(beta.includes("/^\\/ha-(?:mcp|assist)(?:[/?]|$)/"));
+    assert.equal(beta.replace("/^\\/ha-(?:mcp|assist)(?:[/?]|$)/", "/^\\/ha-mcp(?:[/?]|$)/"), stable);
   });
 });

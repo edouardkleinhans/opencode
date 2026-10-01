@@ -21,8 +21,8 @@ ports:
   4096/tcp: null
   4097/tcp: null
 ports_description:
-  4096/tcp: "OpenCode LAN server — only serves traffic when the 'OpenCode LAN server' option is enabled. These are container ports; if the stable OpenCode add-on is installed too, give each one a different host port here."
-  4097/tcp: "OpenChamber LAN web UI (V2 integration pending). Container port — pick a host port that the stable add-on is not already using."
+  4096/tcp: "Authenticated OpenCode LAN server — requires LAN access and a trusted HTTPS reverse proxy. Use a different host port if stable is also installed."
+  4097/tcp: "Authenticated OpenChamber LAN web UI — requires OpenChamber mode, LAN access and a trusted HTTPS reverse proxy."
 
 # File access - Home Assistant config directory
 map:
@@ -100,6 +100,7 @@ options:
   native_ha_mcp_api_id: "assist"
   # Opt-in inbound MCP: automatic trusted-host setup; existing OAuth is retained.
   ha_mcp_server_enabled: false
+  ha_assist_enabled: false
   # Home context: what OpenCode knows about this installation before you type.
   # The briefing is regenerated on every start (never appended to) and the
   # decision-notes digest is capped, so neither grows over time.
@@ -186,6 +187,7 @@ schema:
   native_ha_mcp_enabled: bool
   native_ha_mcp_api_id: str?
   ha_mcp_server_enabled: bool
+  ha_assist_enabled: bool
   home_briefing_enabled: bool
   decision_notes_enabled: bool
 

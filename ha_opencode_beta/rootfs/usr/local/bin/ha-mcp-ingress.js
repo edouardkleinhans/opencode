@@ -4,7 +4,10 @@ const http = require("node:http");
 // This boundary is independent of the UI's loopback/LAN allowlist.
 function routeHaMcp(req, res, { ingressPath, upstreamPath, lan = false }) {
   const pathname = upstreamPath.split("?", 1)[0];
-  if (pathname !== "/ha-mcp" && !pathname.startsWith("/ha-mcp/")) return false;
+  const assist = pathname === "/ha-assist" || pathname.startsWith("/ha-assist/");
+  if (!assist && pathname !== "/ha-mcp" && !pathname.startsWith("/ha-mcp/")) return false;
+  const directoryPath = assist ? "/run/ha-assist" : "/run/ha-facing-mcp";
+  const port = assist ? 8769 : 8767;
   const reject = (status) => {
     res.writeHead(status, { "content-type": "text/plain", "cache-control": "no-store" });
     res.end(status === 503 ? "MCP setup unavailable\n" : "Forbidden\n");
@@ -31,15 +34,15 @@ function routeHaMcp(req, res, { ingressPath, upstreamPath, lan = false }) {
       || ((req.method === "POST" || req.headers.origin !== undefined) && req.headers.origin !== origin.origin)
       || !/^\/api\/hassio_ingress\/[A-Za-z0-9_-]+$/.test(ingressPath)
       || req.headers["x-ingress-path"] !== ingressPath
-      || !["/ha-mcp/", "/ha-mcp/authorize"].includes(pathname)) {
+       || !(assist ? ["/ha-assist/"] : ["/ha-mcp/", "/ha-mcp/authorize"]).includes(pathname)) {
     reject(403); return true;
   }
   let secret;
   let fd;
   try {
-    const directory = fs.lstatSync("/run/ha-facing-mcp");
+    const directory = fs.lstatSync(directoryPath);
     if (!directory.isDirectory() || directory.uid !== 0 || (directory.mode & 0o077)) throw new Error();
-    fd = fs.openSync("/run/ha-facing-mcp/ingress-secret", fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    fd = fs.openSync(`${directoryPath}/ingress-secret`, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
     const stat = fs.fstatSync(fd);
     if (!stat.isFile() || stat.uid !== 0 || (stat.mode & 0o777) !== 0o600 || stat.nlink !== 1 || stat.size !== 43) throw new Error();
     secret = fs.readFileSync(fd, "utf8");
@@ -55,12 +58,12 @@ function routeHaMcp(req, res, { ingressPath, upstreamPath, lan = false }) {
   delete headers.connection;
   delete headers.upgrade;
   delete headers["proxy-connection"];
-  headers.host = "127.0.0.1:8767";
+  headers.host = `127.0.0.1:${port}`;
   headers["x-ha-mcp-ingress-secret"] = secret;
   headers["x-ha-mcp-user-id"] = user;
   headers["x-ha-mcp-external-origin"] = origin.origin;
   headers["x-ha-mcp-external-path"] = ingressPath + pathname;
-  const upstream = http.request({ host: "127.0.0.1", port: 8767, path: upstreamPath, method: req.method, headers }, (response) => {
+  const upstream = http.request({ host: "127.0.0.1", port, path: upstreamPath, method: req.method, headers }, (response) => {
     res.writeHead(response.statusCode, response.headers);
     response.on("error", () => res.destroy());
     response.pipe(res);
