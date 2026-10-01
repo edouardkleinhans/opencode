@@ -27,6 +27,8 @@ is sent to the chosen model provider; its normal usage charges and data policies
 apply. Choose a provider that supports external/companion use; OpenCode free-tier
 restrictions also apply to this private agent. Transient OpenCode sessions are removed on completion or cancellation;
 this is not a secure-erasure guarantee for database files or provider logs.
+A worker/runtime crash can leave a temporary session behind; automatic orphan
+cleanup and crash-recovery retention are not qualified in this first beta.
 
 The pairing key permits model usage through this scoped adapter only. It is
 stored in HA's config entry; the app stores only its digest. Replace/revoke it on
@@ -48,5 +50,6 @@ tools, 32 tool calls, 256 history messages and a 512 KiB request body. Oversized
 history fails explicitly instead of being silently compacted outside HA.
 
 Diagnostics contain protocol/capability flags and selected-API counts only.
-Pairing/setup, native images and full supervised HA acceptance remain release
-gates; see the repository `PLAN.md` for tested evidence.
+Full supervised HA installation, pairing/setup and voice-pipeline acceptance
+remain experimental follow-up work; see the repository `PLAN.md` for tested
+evidence and remaining qualification.

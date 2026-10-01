@@ -11,7 +11,7 @@
 - Discover native HA LLM API IDs in capability reports, diagnose the saved selection, and update tool-development guidance for HA 2026.10 ([#45](https://github.com/magnusoverli/opencode/issues/45)).
 - Include the compatible brace-expansion security fixes from main; thanks @anupamme for [#145](https://github.com/magnusoverli/opencode/pull/145).
 - Install the optional companion from the release's `opencode-assist.zip`, restart HA, enable `ha_assist_enabled` in the app, and pair through its administrator-only `/ha-assist/` Ingress page. Requires HA 2026.10; API choices default to none.
-- Experimental limits: text/schema-validated JSON only; no image generation or attachments. Full supervised HA/voice-pipeline acceptance, crash-recovery qualification and setup/resource UI improvements remain tracked in #45. Existing app functionality remains available with the new adapter disabled by default.
+- Experimental limits: text/schema-validated JSON only; no image generation or attachments. Full supervised HA/voice-pipeline acceptance, crash-recovery qualification and setup/resource UI improvements remain tracked in #45. A crash can leave a temporary session behind. Existing app functionality remains available with the new adapter disabled by default.
 
 - Restore supported V1 OpenAI-compatible provider settings through validated, in-memory V2 conversion; thanks @nomonkeynodeal for reporting [#141](https://github.com/magnusoverli/opencode/issues/141).
 - Explain configuration failures directly in the terminal before the resulting sidecar warning; thanks @smw6180, @Sebazzz and @MechaMtt for reporting [#139](https://github.com/magnusoverli/opencode/issues/139).

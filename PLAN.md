@@ -64,7 +64,8 @@ the remaining list current instead of accumulating historical plans.
   The host initially lacked Buildx; a checksum-verified **0.37.2** client under
   `/tmp/opencode/ha-build-docker` enabled the successful BuildKit build.
 - Local verification (Linux, Node 24.21.0): MCP suite **642 passed / 4 skipped**;
-  beta runtime contracts **261 passed / 3 skipped**; HA-facing discovery/lifecycle
+  beta runtime contracts **262 passed / 3 skipped** in the clean release worktree;
+  HA-facing discovery/lifecycle
   **19 passed**. Skips require browser/editor dependencies or root-only fixtures.
   Channel separation **10 passed**; beta startup-hook security, per-channel option
   declarations, CLI/plugin pin verification and diff whitespace checks passed.
@@ -100,12 +101,12 @@ explicit qualification/follow-up work, rather than claims of completed support:
   service with a compatible account-backed model. Verify caller/exposure behavior
   for the built-in Assist API; selected custom APIs retain their own boundaries.
 - [ ] Qualify restart/crash recovery, inspect temporary-session retention and
-  decide whether a narrowly marked orphan cleanup is needed before publication.
+  decide whether a narrowly marked orphan cleanup is needed. The first
+  experimental release documents this limitation with the adapter disabled by default.
 - [ ] Requalify the separately installed companion against the final HA 2026.10
   release and test installation from the packaged beta ZIP.
-- [ ] Run native arm64 boundary checks, both final candidate image builds and
-  supervised release acceptance; consolidate the beta changelog and publish the
-  reviewed beta through the release workflows when directed.
+- [ ] Complete supervised release acceptance before claiming fully qualified
+  native integration support. Native image checks/publication are tracked above.
 
 The sections below preserve the earlier stable-release record.
 

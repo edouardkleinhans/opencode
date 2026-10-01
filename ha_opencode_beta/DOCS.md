@@ -2,7 +2,7 @@
 
 This is the **beta channel** for the OpenCode add-on. It contains experimental features and fixes that are being validated before inclusion in the stable release.
 
-The next beta is based on **stable 3.1.0**, with the same pinned OpenCode `2.0.13`
+Beta **3.2.0b0** is based on **stable 3.1.0**, with the same pinned OpenCode `2.0.13`
 runtime. HA 2026.10 integration includes native LLM API discovery, prompt/context
 forwarding and an experimental native Assist/AI data-task adapter. The roadmap
 is tracked in [#45](https://github.com/magnusoverli/opencode/issues/45).
@@ -25,8 +25,9 @@ not advertised. Internal ports 8768/8769 must remain unpublished. The companion
 README covers provider usage, pairing replacement, removal and data handling.
 
 Contract tests use OpenCode 2.0.13 and actual HA 2026.10.0b0 ChatLog/config-flow
-classes in the official HA image. Full supervised installation, Assist pipeline
-and native amd64/arm64 release acceptance remain pending.
+classes in the official HA image. Full supervised installation and Assist-pipeline
+acceptance remain pending, as does crash-recovery retention qualification. A
+worker/runtime crash can leave a temporary session behind.
 
 **You can install this alongside the stable OpenCode add-on.** Both appear in the sidebar (as "OpenCode" and "OpenCode Beta").
 
