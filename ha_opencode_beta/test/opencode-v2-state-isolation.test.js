@@ -74,6 +74,15 @@ describe("OpenCode V2 state isolation", () => {
   );
   const mcpServer = read(ROOTFS, "opt", "ha-mcp-server", "index.js");
 
+  it("keeps stable and beta decision notes in their own MCP sidecars", () => {
+    const stableSidecar = read(ADDON, "..", "ha_opencode", "rootfs", "etc", "s6-overlay", "s6-rc.d", "ha-opencode-v2-mcp-sidecar", "run");
+    assert.match(stableSidecar, /^\s+ADDON_CHANNEL=stable \\$/m);
+    assert.match(stableSidecar, /^\s+OPENCODE_DECISION_NOTES_DIR="\$\{OPENCODE_DECISION_NOTES_DIR:-\/homeassistant\/opencode\}" \\$/m);
+    assert.doesNotMatch(stableSidecar, /\/homeassistant\/opencode_beta/);
+    assert.match(v2Sidecar, /^\s+ADDON_CHANNEL=beta \\$/m);
+    assert.match(v2Sidecar, /^\s+OPENCODE_DECISION_NOTES_DIR="\$\{OPENCODE_DECISION_NOTES_DIR:-\/homeassistant\/opencode_beta\}" \\$/m);
+  });
+
   it("assigns persistent V2 state to one atomically selected generation", () => {
     assert.match(environment, /OPENCODE_V2_GENERATIONS_ROOT="\$\{OPENCODE_V2_ROOT\}\/generations"/);
     assert.match(environment, /OPENCODE_V2_CURRENT_FILE="\$\{OPENCODE_V2_ROOT\}\/current"/);

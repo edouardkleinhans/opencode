@@ -1,0 +1,32 @@
+{
+  "title": "OpenCode Assist",
+  "config": {
+    "step": {
+      "user": {"title": "Pair with the OpenCode beta app", "description": "Enable ha_assist_enabled in the app and open its administrator-only /ha-assist/ Ingress page. Enter the internal URL and pairing key shown there. Requires Home Assistant 2026.10.", "data": {"url": "App URL", "api_key": "Pairing key"}},
+      "reauth_confirm": {"title": "Renew pairing", "description": "Create a new pairing key on the app's /ha-assist/ Ingress page.", "data": {"api_key": "New pairing key"}},
+      "reconfigure": {"title": "Update app connection", "data": {"url": "App URL", "api_key": "Pairing key"}}
+    },
+    "error": {"cannot_connect": "Cannot connect to the app.", "invalid_auth": "Pairing key rejected or revoked.", "no_models": "Configure an available provider and model in OpenCode first."},
+    "abort": {"already_configured": "This app is already configured."}
+  },
+  "config_subentries": {
+    "conversation": {
+      "title": "Conversation agent",
+      "step": {
+        "user": {"title": "Add a conversation agent", "description": "Select only the Home Assistant APIs this agent needs. No APIs are selected by default. Assist respects HA exposure and caller context.", "data": {"model": "Model", "llm_hass_api": "Home Assistant APIs", "prompt": "Instructions"}},
+        "reconfigure": {"title": "Configure conversation agent", "data": {"model": "Model", "llm_hass_api": "Home Assistant APIs", "prompt": "Instructions"}}
+      },
+      "error": {"unsupported_model": "Choose a model with tool support when selecting APIs.", "unknown_api": "A selected API is no longer registered."},
+      "abort": {"entry_not_loaded": "Load the app connection first.", "invalid_auth": "Renew the pairing key.", "cannot_connect": "Cannot connect to the app."}
+    },
+    "ai_task_data": {
+      "title": "AI data task",
+      "step": {
+        "user": {"title": "Add an AI data task", "description": "Generate text or schema-validated JSON. Attachments and image generation are not supported.", "data": {"model": "Model"}},
+        "reconfigure": {"title": "Configure AI data task", "data": {"model": "Model"}}
+      },
+      "error": {"unsupported_model": "Select an available model.", "unknown_api": "A selected API is no longer registered."},
+      "abort": {"entry_not_loaded": "Load the app connection first.", "invalid_auth": "Renew the pairing key.", "cannot_connect": "Cannot connect to the app."}
+    }
+  }
+}

@@ -17,6 +17,10 @@ Availability: the \`llm\` integration, the per-domain LLM tool platforms, and th
 2026.7.x or earlier — on those releases only the configured \`/api/mcp\` endpoint and the legacy
 \`/mcp_server/sse\` transport are served, and \`<integration>/llm.py\` is never loaded.
 
+The starter code below targets **Home Assistant 2026.10.0b0**: \`probatio.Schema\`,
+\`ToolResult\`, integration metadata and domain-prefixed tool names. For 2026.8/2026.9,
+consult that release's source instead of copying the 2026.10 imports unchanged.
+
 Upstream references:
 - Architecture: home-assistant/architecture#1412
 - Core plumbing: home-assistant/core#174253
@@ -26,6 +30,11 @@ Upstream references:
 - Tool schema conversion fix: home-assistant/core#176814 (issue #176762)
 - Developer docs: home-assistant/developers.home-assistant#3201
 - Current LLM API docs update: home-assistant/developers.home-assistant#3236
+- API discovery: home-assistant/core#177903 (\`llm/api/list\`, HA 2026.9+)
+- Tool names and metadata: home-assistant/core#179938, #182614, #182714
+- ToolResult: home-assistant/core#182487
+- Tagged examples: https://github.com/home-assistant/core/blob/2026.10.0b0/homeassistant/components/light/llm.py
+- HA guidelines: https://developers.home-assistant.io/docs/core/llm/
 
 Use this when developing a Home Assistant integration or custom integration that should contribute
 curated tools to Assist through \`<integration>/llm.py\`. This is different from OpenCode's own MCP
@@ -42,22 +51,34 @@ Checklist:
 - Gate on exposure. Return \`None\` when \`llm_context.assistant\` is unset, and filter entities with
   \`async_should_expose(hass, llm_context.assistant, entity_id)\` so the assistant only ever sees what
   the user exposed to it.
-- Prefer wrapping existing intents with \`IntentTool\` over hand-written tools. Twelve of the fifteen
-  core platforms do exactly this, which keeps sentence support and tool support in sync.
+- Prefer wrapping existing intents with \`IntentTool\` over hand-written tools to keep sentence
+  support and tool support in sync. Use a domain-prefixed name and set \`integration\`.
 - Keep prompt guidance next to the tools by returning \`LLMTools(tools=..., prompt=...)\`.
 - Read tool arguments from \`tool_input.tool_args\`; request context lives on \`llm_context\`.
-- Raise \`HomeAssistantError\` for expected tool failures; do not encode control-flow errors as success payloads.
+- Return \`ToolResult(data=...)\`; raise \`HomeAssistantError\` or set \`error=True\` for failures.
+- Set \`title\`, \`integration\`, and accurate \`ToolAnnotations\`. Annotations describe behavior;
+  permission/exposure checks must still be enforced by the tool or its intent handler.
 - Keep destructive/admin tools out of Assist unless there is a clear approval model.
 - Add tests for tool visibility, schema validation, success, and error paths.
 - Once the MCP Server integration is set up, registered LLM APIs are exposed at \`/api/mcp/<API ID>\`.
-- Home Assistant also serves every API selected in the MCP Server integration at \`/api/mcp\`. That setting is a multi-select, so this one endpoint can carry several APIs at once.
+- Home Assistant also serves the selected APIs at \`/api/mcp\`, or all registered APIs when the
+  MCP Server's "Expose all LLM APIs" option is enabled. New 2026.10 entries default to all APIs
+  and require admin; existing entries retain their selections and access setting.
 - Keyed endpoints require admin access for every API ID except \`assist\`. An add-on clears that bar — the Supervisor calls Core as its own system user, which is created in the admin group — so a custom API you register can be exercised from OpenCode over \`/api/mcp/<your API ID>\` without a long-lived token.
+- The configured-endpoint selection does not restrict the keyed endpoints. Use \`assist\` for ordinary
+  home control and select custom APIs deliberately. The admin-only \`llm/api/list\` WebSocket command
+  returns \`{"apis":[{"id":"assist","name":"Assist"}]}\`; \`get_agent_capabilities\` reports that
+  registry separately from MCP transport availability. Discovery changes no configuration.
 
 ## Tool parameter schema gotchas
 
-Tool \`parameters\` are converted to JSON Schema by \`voluptuous_openapi\`. Custom function validators
-have no type annotation it can read, so before home-assistant/core#176814 (Home Assistant 2026.8)
-they serialized to an empty schema:
+On 2026.10, tool \`parameters\` use \`probatio.Schema\`; native MCP converts them with
+\`probatio.to_openapi(..., openapi_version="3.1.0")\`, including required parameters.
+Prefer plain types or HA selectors with \`APIInstance.custom_serializer=selector_serializer\`.
+Check the emitted MCP schema as well as Python-side validation.
+
+Older-release compatibility: before home-assistant/core#176814 (Home Assistant 2026.8),
+\`voluptuous_openapi\` could not infer some custom validators, producing an empty schema:
 
 \`\`\`python
 # Produces {"anyOf": [{}, {"items": {"type": "string"}, "type": "array"}]}
@@ -69,7 +90,7 @@ union, fall back to sending raw arguments, and Home Assistant rejects the call w
 \`extra keys not allowed @ data['__unparsedToolInput']\`. This is what broke \`GetLiveContext\` for
 external clients on 2026.7.x.
 
-Write schemas that convert cleanly on every release:
+For integrations targeting those older voluptuous-based releases:
 
 \`\`\`python
 vol.Optional("domain"): vol.All(cv.ensure_list, [cv.string])  # array of strings
@@ -117,7 +138,11 @@ def async_get_tools(
         return None
 
     tools: list[Tool] = [
-        IntentTool(handler.intent_type, handler)
+        IntentTool(
+            f"{DOMAIN}__{handler.intent_type}",
+            handler,
+            integration=DOMAIN,
+        )
         for handler in intent.async_get(hass)
         if handler.intent_type in LLM_INTENTS
     ]
@@ -134,22 +159,29 @@ from __future__ import annotations
 
 from typing import override
 
-import voluptuous as vol
+import probatio
 
 from homeassistant.components.llm import LLMTools
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.llm import LLM_API_ASSIST, LLMContext, Tool, ToolInput
+from homeassistant.helpers.llm import (
+    LLM_API_ASSIST, LLMContext, Tool, ToolAnnotations, ToolInput, ToolResult,
+)
 from homeassistant.util.json import JsonObjectType
 
 
 class ${toolClass}(Tool):
     """Example read-only LLM tool for ${domain}."""
 
-    name = "${domain}_example_status"
+    name = "${domain}__example_status"
+    title = "Get ${domain} status"
+    integration = "${domain}"
     description = "Return a concise ${domain} status summary."
-    parameters = vol.Schema({
-        vol.Optional("include_details"): bool,
+    annotations = ToolAnnotations(
+        read_only=True, destructive=False, idempotent=True, open_world=False
+    )
+    parameters = probatio.Schema({
+        probatio.Optional("include_details"): bool,
     })
 
     @override
@@ -158,7 +190,7 @@ class ${toolClass}(Tool):
         hass: HomeAssistant,
         tool_input: ToolInput,
         llm_context: LLMContext,
-    ) -> JsonObjectType:
+    ) -> ToolResult:
         """Call the tool."""
         if "${domain}" not in hass.data:
             raise HomeAssistantError("${domain} is not loaded")
@@ -169,7 +201,7 @@ class ${toolClass}(Tool):
                 "language": llm_context.language,
                 "device_id": llm_context.device_id,
             }
-        return result
+        return ToolResult(data=result)
 
 
 @callback
@@ -184,7 +216,7 @@ def async_get_tools(
 
     return LLMTools(
         tools=[${toolClass}()],
-        prompt="Use ${toolClass} only when the user asks about ${domain} status.",
+        prompt="Use ${domain}__example_status only when the user asks about ${domain} status.",
     )
 \`\`\`
 
@@ -195,7 +227,7 @@ Full custom API notes:
 - Instantiate \`llm.API\` with keyword arguments, including the required \`hass\`, \`id\`, and \`name\` fields.
 - The registered API ID becomes its native MCP endpoint: \`/api/mcp/<API ID>\`.
 - Set \`APIInstance.custom_serializer\` if your tool schemas need custom conversion for selectors or
-  other voluptuous shapes. \`homeassistant.helpers.llm.selector_serializer\` is the one Assist uses.
+  other probatio shapes. \`homeassistant.helpers.llm.selector_serializer\` is the one Assist uses.
 
 Minimal custom API sketch:
 
@@ -229,7 +261,7 @@ async def async_setup_api(hass: HomeAssistant, entry: ConfigEntry) -> None:
         hass,
         ${apiClass}(
             hass=hass,
-            id="${domain}",
+            id=f"${domain}-{entry.entry_id}",
             name=entry.title,
         ),
     )
@@ -238,6 +270,15 @@ async def async_setup_api(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 ## Recent upstream changes to be aware of
 
+- Tools use domain-prefixed names such as \`homeassistant__GetLiveContext\`; discover names instead
+  of hard-coding old unprefixed names in prompts. The tool provider supplies the prefixed name.
+- In 2026.10, custom tools missing \`integration\` produce a warning and will stop working in 2027.10.
+  Returning plain dicts instead of \`ToolResult\` warns and will stop working in 2027.11.
+- HA's MCP Server accepts \`params._meta["io.home-assistant/device_id"]\` for device context.
+  It is context, not authentication; take it from a trusted caller, never guessed model text.
+- A native conversation provider implements \`ConversationEntity._async_handle_message\` and uses
+  \`ChatLog.async_provide_llm_data\` with user-selected \`CONF_LLM_HASS_API\` options. MCP discovery
+  alone does not register OpenCode as a conversation agent.
 - \`homeassistant/helpers/llm.py\` was roughly halved by home-assistant/core#176082 once the Assist
   API moved into the \`llm\` integration. Older blog posts and snippets that reach into its internals
   are stale.

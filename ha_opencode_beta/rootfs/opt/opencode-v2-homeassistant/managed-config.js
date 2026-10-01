@@ -60,15 +60,6 @@ export function buildReadOnlyPermissions(workspace = DEFAULT_WORKSPACE) {
   ];
 }
 
-export function applyExternalMcpConfig(managed, externalMcp) {
-  if (!externalMcp || Object.keys(externalMcp.servers).length === 0) return managed;
-  const plugin = managed.plugins.find(({ package: name }) => name === DEFAULT_PLUGIN_PACKAGE);
-  if (!plugin) throw new TypeError("external_mcp_config requires the Home Assistant MCP integration to be enabled");
-  plugin.options.externalServers = externalMcp.servers;
-  managed.permissions.push(...externalMcp.permissions);
-  return managed;
-}
-
 export function buildManagedConfig({
   restrictSensitiveFiles = true,
   pluginEnabled = false,
@@ -84,6 +75,7 @@ export function buildManagedConfig({
   decisionNotes = true,
   userHooks = false,
   lspEnabled = false,
+  assistEnabled = false,
 } = {}) {
   const permissions = [
     { action: "read", resource: "*", effect: "allow" },
@@ -135,6 +127,7 @@ export function buildManagedConfig({
   ];
   plugins.push({ package: DEFAULT_CONTEXT_PACKAGE, options: { files: instructions } });
   if (lspEnabled) plugins.push({ package: DEFAULT_LSP_PACKAGE });
+  if (assistEnabled) plugins.push({ package: "file:///opt/opencode-v2-homeassistant/assist-plugin" });
 
   return {
     $schema: "https://opencode.ai/config.json",
@@ -149,6 +142,12 @@ export function buildManagedConfig({
     lsp: false,
     skills: ["/data/.config/opencode/skills"],
     agents: {
+      ...(assistEnabled ? { "home-assistant-assist": {
+        description: "Private HA request adapter; use the companion integration.",
+        mode: "primary", hidden: true,
+        system: "Respond only within the supplied Home Assistant request.",
+        permissions: [{ action: "*", resource: "*", effect: "deny" }],
+      } } : {}),
       [READ_ONLY_AGENT_ID]: {
         description: "Investigate and diagnose Home Assistant with no ability to change anything.",
         mode: "primary",
@@ -158,6 +157,15 @@ export function buildManagedConfig({
     },
     plugins,
   };
+}
+
+export function applyExternalMcpConfig(managed, externalMcp) {
+  if (!externalMcp || Object.keys(externalMcp.servers).length === 0) return managed;
+  const plugin = managed.plugins.find(({ package: name }) => name === DEFAULT_PLUGIN_PACKAGE);
+  if (!plugin) throw new TypeError("external_mcp_config requires the Home Assistant MCP integration to be enabled");
+  plugin.options.externalServers = externalMcp.servers;
+  managed.permissions.push(...externalMcp.permissions);
+  return managed;
 }
 
 function parseBoolean(value, name) {
@@ -186,6 +194,8 @@ export function parseArguments(argv) {
       options.pluginPackage = value;
     } else if (name === "--mcp-endpoint") {
       options.mcpEndpoint = value;
+    } else if (name === "--assist-enabled") {
+      options.assistEnabled = parseBoolean(value, name);
     } else if (name === "--native-mcp-enabled") {
       options.nativeMcpEnabled = parseBoolean(value, name);
     } else if (name === "--native-mcp-endpoint") {

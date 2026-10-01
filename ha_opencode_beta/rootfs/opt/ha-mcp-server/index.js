@@ -75,6 +75,7 @@ import { fileURLToPath } from "url";
 // Extracted pure-function modules (testable in isolation)
 import { detectAnomaly, searchEntities, generateSuggestions, generateStateSummary } from "./lib/intelligence.js";
 import { validateYamlStructure, resolveConfigPath } from "./lib/validation.js";
+import { validateConfigTemplates } from "./lib/template-validation.js";
 import { configApplyGuidance } from "./lib/config-apply.js";
 import { captureHomeAssistantPage } from "./lib/screenshot.js";
 import { extractContentFromHtml, extractConfigurationSection, extractYamlExamples } from "./lib/html-parser.js";
@@ -105,6 +106,9 @@ import { createNativeMcpHandler } from "./lib/native-mcp-handler.js";
 import { formatErrorLogResult, readErrorLogWithFallback } from "./lib/ha-error-log.js";
 import { createSupervisorAppsClient } from "./lib/supervisor-apps.js";
 import { setRegistryArea } from "./lib/registry-area.js";
+import { saveHabOutput } from "./lib/hab-output.js";
+import { createCommandOutputContent } from "./lib/command-output.js";
+import { discoverNativeLlmApis } from "./lib/ha-llm-apis.js";
 import {
   ESPHomeDeviceBuilderClient,
   createESPHomeConfig,
@@ -1832,7 +1836,7 @@ async function fetchHARepairs() {
  * Run a single HA WebSocket API command (auth, send, close).
  * Used for registry dumps that have no REST equivalent.
  */
-function callHAWebSocketCommand(commandType, timeoutMs = 5000, url = "ws://supervisor/core/websocket", fields = {}) {
+function callHAWebSocketCommand(commandType, timeoutMs = 5000, url = SUPERVISOR_WEBSOCKET_URL.toString(), fields = {}) {
   return new Promise((promiseResolve, promiseReject) => {
     const requestSignal = getRequestSignal();
     let settled = false;
@@ -1849,7 +1853,7 @@ function callHAWebSocketCommand(commandType, timeoutMs = 5000, url = "ws://super
     };
     const onAbort = () => settle(promiseReject, cancellationError(requestSignal.reason));
     const timeout = setTimeout(() => {
-      settle(promiseReject, new Error(`WebSocket command '${commandType}' timed out`));
+      settle(promiseReject, Object.assign(new Error(`WebSocket command '${commandType}' timed out`), { code: "timeout" }));
     }, timeoutMs);
 
     let ws;
@@ -1874,12 +1878,15 @@ function callHAWebSocketCommand(commandType, timeoutMs = 5000, url = "ws://super
         } else if (msg.type === "auth_ok") {
           ws.send(JSON.stringify({ ...fields, id: 1, type: commandType }));
         } else if (msg.type === "auth_invalid") {
-          settle(promiseReject, new Error("WebSocket authentication failed"));
-        } else if (msg.type === "result") {
+          settle(promiseReject, Object.assign(new Error("WebSocket authentication failed"), { code: "auth_invalid" }));
+        } else if (msg.type === "result" && msg.id === 1) {
           if (msg.success) {
             settle(promiseResolve, msg.result);
           } else {
-            settle(promiseReject, new Error(msg.error?.message || `WebSocket command '${commandType}' failed`));
+            settle(promiseReject, Object.assign(
+              new Error(msg.error?.message || `WebSocket command '${commandType}' failed`),
+              { code: msg.error?.code },
+            ));
           }
         }
       } catch (_) { /* ignore parse errors, wait for timeout */ }
@@ -1887,6 +1894,9 @@ function callHAWebSocketCommand(commandType, timeoutMs = 5000, url = "ws://super
 
     ws.on("error", (error) => {
       settle(promiseReject, error);
+    });
+    ws.on("close", () => {
+      settle(promiseReject, new Error("Home Assistant closed the WebSocket before the command completed"));
     });
   });
 }
@@ -2116,71 +2126,6 @@ async function checkConfigForDeprecations(yamlConfig, integration = null) {
 // ============================================================================
 // CONFIG VALIDATION HELPERS
 // ============================================================================
-
-/**
- * Extract Jinja2 templates from YAML content and validate each through HA's
- * template engine. Templates containing automation context variables (trigger.*,
- * this.*, etc.) are flagged as unverifiable rather than failed.
- */
-async function extractAndValidateTemplates(yamlContent) {
-  const results = [];
-  
-  // Match {{ ... }} template expressions (handles multiline)
-  const templateRegex = /\{\{[\s\S]*?\}\}/g;
-  // Match {% ... %} template blocks
-  const blockRegex = /\{%[\s\S]*?%\}/g;
-  
-  const templates = new Set();
-  
-  let match;
-  while ((match = templateRegex.exec(yamlContent)) !== null) {
-    templates.add(match[0]);
-  }
-  while ((match = blockRegex.exec(yamlContent)) !== null) {
-    templates.add(match[0]);
-  }
-  
-  // Context variables that can't be validated statically
-  const contextVars = [
-    "trigger.", "this.", "context.", "wait.", "repeat.", "response.",
-  ];
-
-  const truncate = (t) => t.substring(0, 100) + (t.length > 100 ? "..." : "");
-
-  const validateOne = async (template) => {
-    if (contextVars.some(v => template.includes(v))) {
-      return {
-        template: truncate(template),
-        status: "skipped",
-        reason: "Contains runtime context variables (trigger/this/wait/repeat) that cannot be validated statically.",
-      };
-    }
-
-    try {
-      const rendered = await callHA("/template", "POST", { template });
-      return {
-        template: truncate(template),
-        status: "valid",
-        result: String(rendered).substring(0, 200),
-      };
-    } catch (error) {
-      return {
-        template: truncate(template),
-        status: "error",
-        error: error.message,
-      };
-    }
-  };
-
-  // Validate concurrently in small batches to avoid hammering HA core
-  const queue = [...templates];
-  const batchSize = 5;
-  for (let i = 0; i < queue.length; i += batchSize) {
-    results.push(...await Promise.all(queue.slice(i, i + batchSize).map(validateOne)));
-  }
-
-  return results;
-}
 
 // Content-validation results are memoized briefly so the recommended
 // dry-run â†’ write workflow doesn't re-validate identical content twice
@@ -2414,7 +2359,6 @@ function cacheHistory(key, history, createdAt) {
 }
 const DOCS_MAX_CHARS = 12000;
 const CHANGELOG_MAX_CHARS = 16000;
-const CLI_OUTPUT_MAX_CHARS = 20000;
 // Statistics and forecast responses are the large ones; generous enough to hold
 // a useful window without letting a single call swamp the context.
 const SERVICE_RESPONSE_MAX_CHARS = 20000;
@@ -2746,7 +2690,7 @@ const TOOLS = [
   {
     name: "get_agent_capabilities",
     title: "Get Agent Capability Status",
-    description: "Summarize OpenCode's current Home Assistant agent capabilities and detect whether the running Home Assistant instance exposes the native llm component and native MCP endpoints such as /api/mcp/<API ID>. Use this when deciding how to combine OpenCode MCP tools with Home Assistant's emerging native LLM platform.",
+    description: "Report Home Assistant agent capabilities, discover registered native LLM API IDs and names (HA 2026.9+), check the saved API selection, and probe native MCP endpoints. Registry discovery is read-only and separate from endpoint readiness and bridge enablement. Use this to find a custom API ID or diagnose native MCP setup.",
     inputSchema: EMPTY_INPUT_SCHEMA,
     annotations: {
       readOnly: true,
@@ -3966,7 +3910,7 @@ const TOOLS = [
   {
     name: "hab_run",
     title: "Run hab CLI Command",
-    description: "Run a Home Assistant Builder (hab) CLI command for dashboards, area/floor/zone/label/person/category management, helpers, backups, blueprints, calendars, todo lists, notifications, integrations, repairs, events, templates, devices, and search. Automation/script/scene API CRUD is available when specifically needed, but configuration edits default to YAML + write_config_safe followed by an approved domain reload via call_service and read-only verification. Needing a reload is not a reason to switch to API editing. Check 'automation --help' and subcommand help for supported payload/file options; do not guess flags or improvise JSON quoting. Output is human-readable by default; add --json for structured output. Examples: 'entity list --domain light --json', 'area create Kitchen', 'integration reload hue', 'repairs list --json'. Run 'help' for command groups.",
+    description: "Run a Home Assistant Builder (hab) CLI command for dashboards, area/floor/zone/label/person/category management, helpers, backups, blueprints, calendars, todo lists, notifications, integrations, repairs, events, templates, devices, and search. Automation/script/scene API CRUD is available when specifically needed, but configuration edits default to YAML + write_config_safe followed by an approved domain reload via call_service and read-only verification. Needing a reload is not a reason to switch to API editing. Check 'automation --help' and subcommand help for supported payload/file options; do not guess flags or improvise JSON quoting. Output is human-readable by default; add --json for structured output. When meta.truncated is true, meta.full_output_path contains the complete temporary output; never write a dashboard reconstructed from the preview. Examples: 'entity list --domain light --json', 'area create Kitchen', 'integration reload hue', 'repairs list --json'. Run 'help' for command groups.",
     inputSchema: {
       type: "object",
       properties: {
@@ -4113,7 +4057,7 @@ const RESOURCES = [
     uri: "ha://agent/capabilities",
     name: "agent_capabilities",
     title: "Agent Capabilities",
-    description: "OpenCode MCP capabilities and Home Assistant native LLM readiness status",
+    description: "OpenCode MCP capabilities, registered Home Assistant LLM API IDs, saved selection and native MCP readiness",
     mimeType: "application/json",
   },
   {
@@ -4243,6 +4187,10 @@ async function getAgentCapabilities() {
 
 async function probeNativeHaMcpReadiness() {
   const signal = getRequestSignal();
+  const discovery = discoverNativeLlmApis(
+    (type) => callHAWebSocketCommand(type, NATIVE_MCP_PROBE_TIMEOUT_MS),
+    { signal },
+  );
   const baseProbe = probeNativeMcpEndpoint({
     supervisorToken: SUPERVISOR_TOKEN,
     baseUrl: SUPERVISOR_API,
@@ -4268,7 +4216,7 @@ async function probeNativeHaMcpReadiness() {
       signal,
     });
 
-  const [base, configured, assist] = await Promise.all([baseProbe, configuredProbe, assistProbe]);
+  const [base, configured, assist, apiDiscovery] = await Promise.all([baseProbe, configuredProbe, assistProbe, discovery]);
 
   return {
     upstream: {
@@ -4279,12 +4227,15 @@ async function probeNativeHaMcpReadiness() {
       llm_docs_pr: "home-assistant/developers.home-assistant#3236",
       tool_platform_docs_pr: "home-assistant/developers.home-assistant#3201",
       first_release: "2026.8.0",
+      api_list_pr: "home-assistant/core#177903",
+      api_list_first_release: "2026.9.0",
       endpoint_pattern: "/api/mcp/<API ID>",
       configured_endpoint: "/api/mcp",
       assist_api_id: NATIVE_MCP_ASSIST_API_ID,
     },
     configured_api_id: HA_NATIVE_MCP_API_ID,
     configured_endpoint_mode: HA_NATIVE_MCP_API_ID ? "keyed_api" : "configured_api",
+    api_discovery: apiDiscovery,
     base,
     configured,
     assist,
@@ -4307,40 +4258,6 @@ function createCompactJsonContent(summary, data, meta = {}, options = {}) {
     audience: options.audience || ["assistant"],
     priority: options.priority ?? 0.7,
   });
-}
-
-function createCommandOutputContent(toolName, command, output, options = {}) {
-  const text = String(output ?? "").trim();
-  const baseMeta = { tool: toolName, command };
-
-  try {
-    const parsed = JSON.parse(text);
-    const rawJson = JSON.stringify(parsed);
-    if (rawJson.length <= CLI_OUTPUT_MAX_CHARS) {
-      return createCompactJsonContent(
-        `${toolName} command completed`,
-        parsed,
-        { ...baseMeta, format: "json", truncated: false, original_chars: rawJson.length },
-        options
-      );
-    }
-
-    const truncated = truncateText(rawJson, { maxChars: CLI_OUTPUT_MAX_CHARS });
-    return createCompactJsonContent(
-      `${toolName} command completed with large JSON output`,
-      { raw_json_preview: truncated.text },
-      { ...baseMeta, format: "json", ...truncated, text: undefined },
-      options
-    );
-  } catch {
-    const truncated = truncateText(text, { maxChars: CLI_OUTPUT_MAX_CHARS });
-    return createCompactJsonContent(
-      `${toolName} command completed`,
-      { output: truncated.text },
-      { ...baseMeta, format: "text", ...truncated, text: undefined },
-      options
-    );
-  }
 }
 
 // ============================================================================
@@ -5388,8 +5305,13 @@ async function handleToolCall(request) {
           });
         }
         
-        // Steps 2-6 depend only on the content â€” reuse a recent dry-run's results
-        const memoKey = createHash("sha256").update(`${validate_templates}:${content}`).digest("hex");
+        // Template validation depends on the current file as well as the proposed content.
+        let previousContent = null;
+        if (validate_templates && existsSync(resolvedPath)) {
+          try { previousContent = readFileSync(resolvedPath, "utf-8"); } catch (_) { /* validate without a baseline */ }
+        }
+        const memoKey = createHash("sha256")
+          .update(JSON.stringify([resolvedPath, validate_templates, previousContent, content])).digest("hex");
         let contentChecks = getValidationMemo(memoKey);
 
         if (!contentChecks) {
@@ -5437,7 +5359,10 @@ async function handleToolCall(request) {
             (async () => {
               if (!validate_templates) return [];
               try {
-                return await extractAndValidateTemplates(content);
+                return await validateConfigTemplates(content, {
+                  previousContent,
+                  render: (template) => callHA("/template", "POST", { template }),
+                });
               } catch (error) {
                 sendLog("warning", "config", { action: "template_validation_failed", error: error.message });
                 return [{ template: "(all)", status: "skipped", reason: `Template validation unavailable: ${error.message}` }];
@@ -5582,7 +5507,7 @@ async function handleToolCall(request) {
             responseText += `## Template Validation\n\n`;
             responseText += `- Valid: ${validTemplates.length}\n`;
             responseText += `- Errors: ${templateErrors.length}\n`;
-            responseText += `- Skipped (runtime context): ${skippedTemplates.length}\n\n`;
+            responseText += `- Skipped (unchanged or runtime-dependent): ${skippedTemplates.length}\n\n`;
           }
           
           if (depSuggestions.length > 0) {
@@ -7126,7 +7051,10 @@ async function handleToolCall(request) {
         }
         
         return makeCompatibleResponse({
-          content: [createCommandOutputContent("hab", command, result, { audience: ["user", "assistant"], priority: 0.7 })],
+          content: [createCommandOutputContent("hab", command, result, {
+            audience: ["user", "assistant"], priority: 0.7,
+            saveLargeOutput: saveHabOutput,
+          })],
         });
       }
 

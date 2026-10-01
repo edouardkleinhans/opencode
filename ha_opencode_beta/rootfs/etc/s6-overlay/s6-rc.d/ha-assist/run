@@ -1,0 +1,10 @@
+#!/command/with-contenv bashio
+set -e
+umask 077
+if [ "$(bashio::config 'ha_assist_enabled' 2>/dev/null || echo false)" != "true" ]; then
+    exec sleep infinity
+fi
+# Pairing/backend credentials remain in this root-owned worker, not agent shells.
+exec /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/data \
+    SUPERVISOR_TOKEN="${SUPERVISOR_TOKEN:-}" \
+    node /opt/opencode-v2-homeassistant/assist-main.js

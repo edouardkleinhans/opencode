@@ -57,7 +57,7 @@ export function createLanProxy({ mode, origin, proxies, corsOrigins = [], native
       path = decodeURIComponent(new URL(req.url, origin).pathname);
       if (path.includes("%") || path.includes("\\")) return 400;
     } catch { return 400; }
-    if (path.startsWith("/api/ha-editor-lsp") || path.startsWith("/api/hassio_ingress") || path.startsWith("/__ha") || path === "/ha-mcp" || path.startsWith("/ha-mcp/")) return 403;
+    if (path.startsWith("/api/ha-editor-lsp") || path.startsWith("/api/hassio_ingress") || path.startsWith("/__ha") || /^\/ha-(?:mcp|assist)(?:\/|$)/.test(path)) return 403;
     if (mode === "api") {
       if (!(path.startsWith("/api/") || path === "/openapi.json")) return 404;
       if (req.method === "OPTIONS" && originHeader && req.headers["access-control-request-method"]) return 204;

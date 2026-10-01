@@ -32,7 +32,7 @@ GENERATION_RE = re.compile(r"^[a-f0-9]{32}$")
 # fixture. Unknown builds and downgrades must not open a user's database.
 V2_UPGRADE_SOURCES = {"0.0.0-beta-18684", "0.0.0-beta-19242"}
 V2_UPGRADE_TARGET = "2.0.13"
-MAX_DATABASE_BYTES = 16 * 1024 * 1024 * 1024
+MAX_DATABASE_BYTES = 32 * 1024 * 1024 * 1024
 SOURCE_SESSION_COLUMNS = (
     "id",
     "project_id",
@@ -1200,6 +1200,11 @@ def inventory(source: Path) -> dict:
         if name in {"database", "database_wal"}
     )
     if database_bytes > MAX_DATABASE_BYTES:
+        print(
+            f"OpenCode V2 migration size preflight: database_and_wal_bytes={database_bytes} "
+            f"limit_bytes={MAX_DATABASE_BYTES}",
+            file=sys.stderr,
+        )
         raise MigrationError("database_too_large")
     return {
         "database": database is not None,
@@ -1885,8 +1890,24 @@ def prepare(args: argparse.Namespace) -> dict:
             if source_info["legacy_json_store"] and not source_info["database"]:
                 raise MigrationError("legacy_json_requires_v1")
             required = source_info["database_bytes"] * 3 + 256 * 1024 * 1024
-            if shutil.disk_usage(root).free < required:
+            available = shutil.disk_usage(root).free
+            if source_info["database"]:
+                print(
+                    f"OpenCode V2 migration storage preflight: "
+                    f"database_and_wal_bytes={source_info['database_bytes']} "
+                    f"required_free_bytes={required} available_bytes={available} "
+                    f"limit_bytes={MAX_DATABASE_BYTES}",
+                    file=sys.stderr,
+                )
+            if available < required:
                 raise MigrationError("insufficient_space")
+            if source_info["database"]:
+                print(
+                    "OpenCode V2 migration in progress: verifying and copying existing history; "
+                    "Ingress may show 502 until startup finishes. Wait for the ready message or a migration error before restarting.",
+                    file=sys.stderr,
+                    flush=True,
+                )
 
             atomic_json(
                 journal,
@@ -1935,12 +1956,24 @@ def prepare(args: argparse.Namespace) -> dict:
                     "target_version": args.target_version,
                 },
             )
+            if source_info["database"]:
+                print(
+                    "OpenCode V2 migration in progress: private snapshot ready; converting history",
+                    file=sys.stderr,
+                    flush=True,
+                )
             convert_candidate(
                 candidate,
                 args.v2_bin.resolve(),
                 args.timeout,
                 args.runtime_user,
             )
+            if source_info["database"]:
+                print(
+                    "OpenCode V2 migration in progress: conversion finished; validating history",
+                    file=sys.stderr,
+                    flush=True,
+                )
             target_database = target_data / "opencode.db"
             validate_tree(candidate)
             validate_database(target_database)

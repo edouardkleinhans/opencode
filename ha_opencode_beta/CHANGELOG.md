@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## 3.2.0b0
+
+- First experimental HA native-integration beta, based on stable 3.1.0 with OpenCode 2.0.13 and the existing OpenChamber pin.
+- Add experimental native Assist conversations and validated AI data tasks through a separately installed HA companion, with scoped pairing, streaming and cancellation ([#45](https://github.com/magnusoverli/opencode/issues/45)).
+- Integrate native HA prompt/context guidance, preserve modern tool schemas and metadata, and qualify the bridge with the pinned OpenCode runtime ([#45](https://github.com/magnusoverli/opencode/issues/45)).
+- Include stable's large-history migration progress, complete HAB exports and runtime-aware template validation.
+- Discover native HA LLM API IDs in capability reports, diagnose the saved selection, and update tool-development guidance for HA 2026.10 ([#45](https://github.com/magnusoverli/opencode/issues/45)).
+- Include the compatible brace-expansion security fixes from main; thanks @anupamme for [#145](https://github.com/magnusoverli/opencode/pull/145).
+- Install the optional companion from the release's `opencode-assist.zip`, restart HA, enable `ha_assist_enabled` in the app, and pair through its administrator-only `/ha-assist/` Ingress page. Requires HA 2026.10; API choices default to none.
+- Experimental limits: text/schema-validated JSON only; no image generation or attachments. Full supervised HA/voice-pipeline acceptance, crash-recovery qualification and setup/resource UI improvements remain tracked in #45. Existing app functionality remains available with the new adapter disabled by default.
+
 - Restore supported V1 OpenAI-compatible provider settings through validated, in-memory V2 conversion; thanks @nomonkeynodeal for reporting [#141](https://github.com/magnusoverli/opencode/issues/141).
 - Explain configuration failures directly in the terminal before the resulting sidecar warning; thanks @smw6180, @Sebazzz and @MechaMtt for reporting [#139](https://github.com/magnusoverli/opencode/issues/139).
 - Add opt-in `openchamber_lan_native_apps` for native OpenChamber login through the HTTPS LAN frontend, with authenticated token/CORS/stream coverage; thanks @Rahulsharma0810 for reporting [#135](https://github.com/magnusoverli/opencode/issues/135) and contributing [#136](https://github.com/magnusoverli/opencode/pull/136).

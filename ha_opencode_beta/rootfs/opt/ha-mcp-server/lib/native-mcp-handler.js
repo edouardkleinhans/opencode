@@ -6,6 +6,7 @@ import {
   validateJsonRpcMessage,
 } from "./ha-native-mcp.js";
 import { sanitizeToolsListResult } from "./native-mcp-schema.js";
+import { addNativeMcpContextInstructions } from "./native-mcp-context.js";
 
 export function createNativeMcpHandler({
   fetchImpl = fetch,
@@ -72,6 +73,9 @@ export function createNativeMcpHandler({
     } finally {
       signal?.removeEventListener("abort", abort);
       if (key && activeRequests.get(key) === controller) activeRequests.delete(key);
+    }
+    if (message.method === "initialize" && response?.result && !response.error) {
+      return { ...response, result: addNativeMcpContextInstructions(response.result) };
     }
     if (!response || message.method !== "tools/list" || !sanitizeSchemas) return response;
 

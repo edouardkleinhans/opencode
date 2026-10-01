@@ -9,6 +9,7 @@ import {
   readFile,
   readdir,
   rm,
+  truncate,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -98,6 +99,32 @@ describe("OpenCode V2 copy-on-write migration", () => {
       part_count: 0,
       content_part_count: 0,
     });
+  });
+
+  it("accepts a database and WAL above the old 16 GiB cap but still rejects files beyond 32 GiB", async () => {
+    const source = join(sandbox, "sparse-large-source");
+    const database = join(source, "opencode.db");
+    const wal = join(source, "opencode.db-wal");
+    await mkdir(source);
+    try {
+      // Sparse files test the preflight boundary without allocating or copying
+      // a customer's multi-gigabyte database; inventory only stats these files.
+      await writeFile(database, "");
+      await writeFile(wal, "");
+      await truncate(database, 17 * 1024 ** 3);
+      await truncate(wal, 1024 ** 3);
+      const accepted = runMigrator(python, ["inventory", "--source-data", source]);
+      assert.equal(accepted.status, 0, accepted.stderr);
+      assert.equal(JSON.parse(accepted.stdout).database_bytes, 18 * 1024 ** 3);
+
+      await truncate(database, 32 * 1024 ** 3);
+      const refused = runMigrator(python, ["inventory", "--source-data", source]);
+      assert.equal(refused.status, 1);
+      assert.match(refused.stderr, /database_too_large/);
+      assert.match(refused.stderr, /limit_bytes=34359738368/);
+    } finally {
+      await rm(source, { recursive: true, force: true });
+    }
   });
 
   it("fails closed on dropped content, wrong ownership, and unexpected credentials", () => {

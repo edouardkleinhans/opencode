@@ -2,8 +2,8 @@
 # =============================================================================
 # Release-channel identity
 #
-# Stable remains on OpenCode V1 while this beta tree integrates V2. Channel
-# identity still enters through ADDON_CHANNEL and is centralised here because
+# Both channels use OpenCode V2. Channel identity enters through ADDON_CHANNEL
+# and is centralised here because
 # both add-ons share the live /homeassistant workspace.
 #
 # Sourced, not executed.

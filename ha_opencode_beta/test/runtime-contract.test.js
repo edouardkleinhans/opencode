@@ -3,8 +3,7 @@
 // once — Dockerfile pins, CI-read pins, and every script that builds a PATH — so
 // it is asserted here rather than trusted to review.
 //
-// Scoped to the beta add-on, whose V2 runtime contract intentionally differs
-// from the V1 stable add-on.
+// Scoped to this add-on's pinned V2 runtime contract.
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");

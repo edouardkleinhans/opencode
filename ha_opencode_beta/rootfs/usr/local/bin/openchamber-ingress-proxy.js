@@ -943,7 +943,7 @@ function proxyUpgrade(req, socket, head) {
 
   const ingressPath = ingressPathFromRequest(req);
   const upstreamPath = stripIngressPath(req.url || "/", ingressPath);
-  if (/^\/ha-mcp(?:[/?]|$)/.test(upstreamPath)) {
+  if (/^\/ha-(?:mcp|assist)(?:[/?]|$)/.test(upstreamPath)) {
     socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
     return;
   }

@@ -52,15 +52,15 @@ jobs:
           # allowed to have moved the beta add-on itself, because this job
           # publishes main's ha_opencode_beta/ as the storefront for an image
           # built from the tag.
-          if ! git diff --quiet "${TAG}" HEAD -- ha_opencode_beta/; then
-            echo "::error::main has moved past ${TAG} inside ha_opencode_beta/."
+          if ! git diff --quiet "${TAG}" HEAD -- ha_opencode_beta/ custom_components/opencode_assist/ scripts/package-ha-assist.py; then
+            echo "::error::main has moved past ${TAG} inside the beta or its companion sources."
             echo "::error::The published storefront would not match the image built from ${TAG}."
-            git diff --stat "${TAG}" HEAD -- ha_opencode_beta/
+            git diff --stat "${TAG}" HEAD -- ha_opencode_beta/ custom_components/opencode_assist/ scripts/package-ha-assist.py
             echo "::error::Either tag main's current tip, or reset main to ${TAG}."
             exit 1
           fi
 
-          echo "OK: ${TAG} is on main and ha_opencode_beta/ matches main's tip."
+          echo "OK: ${TAG} is on main and the beta/companion sources match main's tip."
 
       - name: Guard against publishing a downgrade
         env:
@@ -159,6 +159,9 @@ jobs:
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: Package the matching optional HA companion
+        run: python3 scripts/package-ha-assist.py "${RUNNER_TEMP}/opencode-assist.zip"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
@@ -167,3 +170,4 @@ jobs:
           body: ${{ steps.changelog.outputs.content }}
           draft: false
           prerelease: true
+          files: ${{ runner.temp }}/opencode-assist.zip
