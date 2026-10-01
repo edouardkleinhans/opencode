@@ -24,7 +24,7 @@ at `/usr/share/doc/ha-opencode/NOTICE` and in this repository's
 ## Current Beta Changes
 
 - **OpenChamber session creation fix**: Beta `3.0.0b19` fixes HTTP 400 errors when creating sessions or sending JSON requests through Home Assistant Ingress. A first message and free-model reply have been verified through the actual browser UI and Core Ingress.
-- **Official V2 runtime**: Beta `3.0.0b23` pins the CLI and plugin to OpenCode `2.0.20` using the official `@opencode` packages.
+- **Official V2 runtime**: Beta `3.0.0b16` pins the CLI and plugin to OpenCode `2.0.13` using the official `@opencode` packages.
 - **Forward state upgrades**: Earlier V2 data upgrades through a validated private copy, preserving conversations, sign-ins and permissions. Successful upgrades remove obsolete generations; failed conversion preserves its input and reports an error. There is no application runtime fallback or rollback selector.
 - **V2-only runtime**: Beta `3.0.0b18` runs one pinned OpenCode V2 server. V1 and the runtime selector have been removed. The server runs as root for Home Assistant filesystem compatibility; its attached terminal runs as UID `60001`.
 - **Managed CLI**: `opencode` and `opencode2` address the same V2 server. `opencode status`, `opencode service status`, and `opencode api GET /api/info` inspect the existing server without starting another daemon.

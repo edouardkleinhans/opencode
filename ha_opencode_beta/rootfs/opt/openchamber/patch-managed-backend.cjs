@@ -8,13 +8,9 @@ function patch(file, before, after) {
   if (source.split(before).length !== 2) throw new Error(`Unexpected preview source: ${file}`);
   fs.writeFileSync(target, source.replace(before, after));
 }
-// The server password reaches the preview only through the process-owned symbol
-// the HA launcher sets from a root-owned file. Upstream v2.0.4 now reads
-// OPENCODE_PASSWORD and then OPENCODE_SERVER_PASSWORD, so the whole
-// environment-derived expression is replaced: neither name is consulted.
-patch("hmr-state-runtime.js", `const initialPassword = [processLike.env.OPENCODE_PASSWORD, processLike.env.OPENCODE_SERVER_PASSWORD]
-      .map((value) => (typeof value === 'string' ? value.trim() : ''))
-      .find((value) => value.length > 0) || '';`, `const initialPassword = globalThis[Symbol.for("ha.openchamber.credential")] || '';`);
+patch("hmr-state-runtime.js", `const initialPassword = typeof processLike.env.OPENCODE_SERVER_PASSWORD === 'string'
+      ? processLike.env.OPENCODE_SERVER_PASSWORD.trim()
+      : '';`, `const initialPassword = globalThis[Symbol.for("ha.openchamber.credential")] || '';`);
 patch("auth-state-runtime.js", "process.env.OPENCODE_SERVER_PASSWORD = normalized;",
   "// The HA app keeps this credential in process-owned state only.");
 patch("lifecycle.js", "const startOpenCode = async () => {",
