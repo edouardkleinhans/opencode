@@ -210,7 +210,44 @@ Use these prompts for complex tasks:
 
 The `hab_run` MCP tool provides access to the full Home Assistant admin CLI. It wraps the `hab` (Home Assistant Builder) CLI as a native MCP tool.
 
-`hab` outputs human-readable text by default. Use `--json` on any command for structured JSON output that is easier to parse programmatically.
+The app pins **hab 1.7.2**. Prefer `hab_run(args=[...])`: each argument stays literal,
+including JSON, templates, apostrophes and spaces. The legacy `command` string is
+also accepted; pass exactly one form. The gateway defaults to JSON and disables
+CLI update checks. Shell hab defaults to JSON when non-interactive, text otherwise.
+
+Start with `args=["schema"]` for compact discovery, or use
+`args=["schema","--index","--search","dashboard patch","--limit","10"]`.
+Follow `next_offset` while `complete` is false; a page is not the whole catalog.
+Request only the chosen command's schema: the gateway requests native `--compact`
+by default and preserves payload/output contracts, schema versions and identities.
+`args=["guide","list"]` returns a compact topic index; load one guide when needed.
+Upstream schema annotations describe behavior, not permission grants.
+Use `--brief`, `--count`, `--limit` and specific filters where the schema supports
+them. The full gateway is available only in the full MCP profile.
+
+Read before changing, choose the smallest resource-level operation, preview when
+supported, apply with the standing approval rules, and read back. A `--plan` can
+be a static description rather than a live diff or complete HA validation.
+For dashboard fields, prefer `dashboard patch`: its `--plan` reads the current
+config and returns an actual diff. Review it, then pass the same `base_revision`
+to `--if-match` on apply. Exact JSON Pointer targets select objects; deep merges
+preserve unrelated fields, supplied arrays replace, and `--remove` deletes fields.
+Existing card/view `update --data` commands still replace the selected object.
+Entity rename changes its friendly name, not its entity ID.
+
+Patch `status: verified` confirms stored JSON; `noop` performs no save. On failures,
+inspect `error.details.result.saved` and `.verified`: `saved: null` is uncertain,
+not proof the write failed. No automatic retry; a conflict requires reinspection
+and review of a new diff. Preview does not prove write permission or server acceptance;
+read-back does not verify rendering, entity references or resources. HA has no atomic
+conditional save, so an edit between the final read and save can still be overwritten.
+
+Read the nested CLI `success`, `error`, `partial_result`, `warnings`,
+`missing_sections` and `verification_commands`; process completion alone does not
+verify the desired HA state. The default deadline is 60 seconds, including reload
+waits; `timeout_seconds` allows 1–120. On timeout, cancellation or an output-limit
+failure, inspect state before retrying a mutation. Prefer dedicated ESPHome tools
+for long builds/uploads/logs. JSON streams are NDJSON, not one final envelope.
 
 ### When to Use hab_run vs Other MCP Tools
 
@@ -220,81 +257,59 @@ The `hab_run` MCP tool provides access to the full Home Assistant admin CLI. It 
 ### Common hab_run Commands
 
 ```
-# List entities (--json for structured output)
-hab_run(command="entity list --domain light --json")
-hab_run(command="entity get light.living_room --json")
-hab_run(command="entity logbook sensor.power --start 2h --json")
+# Discover one command contract or workflow
+hab_run(args=["schema", "--index", "--search", "dashboard patch", "--limit", "10"])
+hab_run(args=["schema", "dashboard", "patch", "--compact"])
+hab_run(args=["schema", "dashboard", "card", "update"])
+hab_run(args=["guide", "dashboard"])
 
-# Call actions
-hab_run(command='action call light.turn_on --entity light.living_room --data \'{"brightness": 200}\'')
+# Focused reads
+hab_run(args=["entity", "list", "--domain", "light", "--brief", "--limit", "20"])
+hab_run(args=["entity", "get", "light.living_room", "--related"])
+hab_run(args=["automation", "list", "--brief"])
+hab_run(args=["automation", "get", "my-automation"])
+hab_run(args=["dashboard", "list", "--brief"])
+hab_run(args=["dashboard", "card", "get", "my-dashboard", "home", "0", "--section", "0"])
 
-# Call actions that answer with data — needs --return-response, or hab reports
-# "Service call requires responses but caller did not ask for responses"
-hab_run(command='action call weather.get_forecasts --entity weather.home --data \'{"type": "daily"}\' --return-response')
+# Preview a field-level edit; apply only after reviewing with approval
+hab_run(args=["dashboard", "patch", "my-dashboard", "--target", "/views/0/cards/0", "--data", "{\"name\":\"Kitchen\"}", "--plan"])
+# Replace the placeholder with the exact base_revision returned above
+hab_run(args=["dashboard", "patch", "my-dashboard", "--target", "/views/0/cards/0", "--data", "{\"name\":\"Kitchen\"}", "--if-match", "sha256:<base_revision>"])
 
-# Manage automations
-hab_run(command="automation list --json")
-hab_run(command="automation get my-automation")
+# Approved API actions that return data; MCP call_service is normally preferred
+hab_run(args=["action", "call", "weather.get_forecasts", "--entity", "weather.home", "--data", "{\"type\":\"daily\"}", "--return-response"])
 
-# Manage scenes
-hab_run(command="scene list --json")
-hab_run(command='scene activate "Movie Time"')
+# Preview before approved creation
+hab_run(args=["area", "create", "Kitchen", "--plan"])
+hab_run(args=["person", "create", "Alice", "--plan"])
+hab_run(args=["helper", "input-boolean", "create", "Guest Mode", "--plan"])
 
-# Manage dashboards
-hab_run(command="dashboard list --json")
+# To-do lists and notifications (writes require approval)
+hab_run(args=["todo", "lists"])
+hab_run(args=["todo", "items", "todo.shopping"])
+hab_run(args=["todo", "add", "todo.shopping", "Buy milk", "--plan"])
+hab_run(args=["todo", "complete", "todo.shopping", "item-uid", "--plan"])
+hab_run(args=["notification", "list"])
+hab_run(args=["notification", "create", "Backup done", "--title", "Status", "--plan"])
 
-# Manage areas
-hab_run(command="area list --json")
-hab_run(command="area create Kitchen")
+# Integration IDs come from the live list, not a guessed domain
+hab_run(args=["integration", "list", "--domain", "hue"])
+hab_run(args=["integration", "reload", "config-entry-id", "--plan"])
+hab_run(args=["repairs", "list"])
+# An approved ignore needs BOTH the issue domain and its ID:
+hab_run(args=["repairs", "ignore", "integration_domain", "issue_id"])
 
-# Manage people
-hab_run(command="person list --json")
-hab_run(command='person create --name "Alice"')
-
-# Manage helpers
-hab_run(command='helper create input_boolean --name "Guest Mode"')
-
-# To-do lists
-hab_run(command="todo list --json")
-hab_run(command="todo item list todo.shopping --json")
-hab_run(command='todo item add todo.shopping "Buy milk"')
-hab_run(command="todo item complete todo.shopping <uid>")
-
-# Notifications
-hab_run(command="notification list --json")
-hab_run(command='notification create --message "Backup done" --title "Status"')
-hab_run(command="notification dismiss <notification_id>")
-
-# Integration management
-hab_run(command="integration list --json")
-hab_run(command="integration reload hue")
-hab_run(command="integration disable mqtt")
-
-# Repair issues
-hab_run(command="repairs list --json")
-hab_run(command="repairs ignore <issue_id>")
-
-# Fire events
-hab_run(command="event list --json")
-hab_run(command='event fire my_custom_event --data \'{"key": "value"}\'')
-
-# Render templates
-hab_run(command="template render --expression \"{{ states('sensor.temperature') }}\"")
-
-# Backups
-hab_run(command="backup list --json")
-hab_run(command="backup create")
-
-# System info
-hab_run(command="system info --json")
-hab_run(command="system health --json")
-hab_run(command="overview --json")
-
-# See all available commands
-hab_run(command="help")
+# Templates remain a single literal argument
+hab_run(args=["template", "render", "{{ states('sensor.temperature') }}"])
+hab_run(args=["backup", "list", "--brief"])
+hab_run(args=["backup", "create", "Pre-change", "--plan"])
+hab_run(args=["system", "health"])
+hab_run(args=["overview"])
 ```
 
 Auth is pre-configured via Supervisor token — no login required.
+Marketplace commands require HA 2026.11+; a command's presence does not establish
+that the connected HA version or permissions support it. Consult live capabilities.
 
 ## zigporter_run Tool (Zigbee Toolkit)
 
@@ -303,12 +318,14 @@ The `zigporter_run` MCP tool provides access to zigporter — a Zigbee device ma
 ### When to Use zigporter_run vs Other Tools
 
 - **Use zigporter_run** for: cascade entity/device renames (patches automations, scripts, scenes, dashboards), Zigbee device inspection across integrations, stale device cleanup, Z2M device listing, mesh visualization
-- **Use hab_run** for: simple entity/device renames (single registry update, no cascade), dashboard CRUD, area management, helpers, backups
+- **Use hab_run** for: entity friendly-name changes, dashboard CRUD, area management, helpers, backups
 - **Use MCP tools** for: entity state queries, service calls, config writing, history, diagnostics
 
 ### Key difference: cascade rename
 
-`hab` can rename an entity or device in the HA registry, but references in automations, scripts, scenes, and dashboards are NOT updated. `zigporter` patches ALL references atomically — this is its unique value.
+`hab entity rename` changes the friendly name only. The pinned CLI has no
+`entity update` or `device update` command. Use zigporter's dry-run workflow for
+entity-ID/cascade renames and inspect its documented template-reference limitations.
 
 ### Common zigporter_run Commands
 

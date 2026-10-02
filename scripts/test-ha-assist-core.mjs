@@ -5,11 +5,16 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { startAssistFixture } from "../ha_opencode_beta/test/helpers/assist-fixture.mjs";
-import { startAssistHttp } from "../ha_opencode_beta/rootfs/opt/opencode-v2-homeassistant/assist-http.js";
-import { createAssistBootstrap } from "../ha_opencode_beta/rootfs/opt/opencode-v2-homeassistant/assist-discovery.js";
-import { openAssistPairing } from "../ha_opencode_beta/rootfs/opt/opencode-v2-homeassistant/assist-pairing.js";
-import { createAssistRestartNotification } from "../ha_opencode_beta/rootfs/opt/opencode-v2-homeassistant/assist-notification.js";
+
+const channel = process.env.ADDON_CHANNEL || "beta";
+assert.ok(["stable", "beta"].includes(channel), "Unknown add-on channel");
+const addon = channel === "stable" ? "ha_opencode" : "ha_opencode_beta";
+const runtime = `../${addon}/rootfs/opt/opencode-v2-homeassistant`;
+const { startAssistFixture } = await import(`../${addon}/test/helpers/assist-fixture.mjs`);
+const { startAssistHttp } = await import(`${runtime}/assist-http.js`);
+const { createAssistBootstrap } = await import(`${runtime}/assist-discovery.js`);
+const { openAssistPairing } = await import(`${runtime}/assist-pairing.js`);
+const { createAssistRestartNotification } = await import(`${runtime}/assist-notification.js`);
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const fixture = await startAssistFixture(async (body, emit) => {
@@ -39,7 +44,7 @@ try {
     "-e", "PYTHONPATH=/work", "-e", "PYTHONDONTWRITEBYTECODE=1", "-e", `ASSIST_FIXTURE_URL=http://127.0.0.1:${service.core.address().port}`,
     "-e", `ASSIST_FIXTURE_BOOTSTRAP=${bootstrap.current().bootstrap}`,
     "-e", `ASSIST_FIXTURE_NOTIFICATION=${notification}`,
-    "-v", `${root}ha_opencode_beta/rootfs/opt/opencode-assist/custom_components:/work/custom_components:ro`, "-v", `${root}tests/ha_assist_contract.py:/work/ha_assist_contract.py:ro`, "-w", "/work",
+    "-v", `${root}${addon}/rootfs/opt/opencode-assist/custom_components:/work/custom_components:ro`, "-v", `${root}tests/ha_assist_contract.py:/work/ha_assist_contract.py:ro`, "-w", "/work",
     "ghcr.io/home-assistant/home-assistant:2026.10.0b0", "ha_assist_contract.py"], { stdio: "inherit" });
   const [code] = await once(child, "exit");
   process.exitCode = code ?? 1;

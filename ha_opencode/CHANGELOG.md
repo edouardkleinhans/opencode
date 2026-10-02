@@ -3,6 +3,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Promote beta 3.2.0b8 to stable with hab 1.7.2 native compact discovery, verified dashboard patches and opt-in experimental Assist integration.
+
+## 3.2.0
+
+- Promote the 3.2 beta series with OpenCode CLI/plugin **2.0.22**, OpenChamber **2.1.0** and hab **1.7.2**, pinned to exact release sources. Existing stable conversations, sign-ins and settings are preserved during the validated state upgrade.
+- Use hab's native compact schemas and searchable, paginated command index while preserving payload/output contracts and schema identities. Structured arguments avoid quoting errors; complete large results are retained within the output bound.
+- Prefer field-level dashboard patches with real preview diffs, revision checks, no-op detection and stored-configuration verification. Preserve unrelated fields and report conflicts, rejections and uncertain saves without automatic write retries; rendering still needs a visual check.
+- Improve Home Assistant native LLM API discovery and prompt/context forwarding while preserving modern tool schemas, metadata and read-only restrictions.
+- Add opt-in **experimental OpenCode Assist** conversations and AI data tasks for **HA 2026.10 with Supervisor**, with bundled companion **0.1.0b7**, automatic discovery/pairing, independent model settings and one entity of each type per app connection ([#45](https://github.com/magnusoverli/opencode/issues/45)).
+- To use Assist, enable `ha_assist_enabled`, restart the app, then restart **Home Assistant Core** and configure the discovered integration. Select APIs explicitly; voice also needs separately configured speech engines. Manual, edited or beta-managed companion installations are preserved and need the documented ownership-switch steps. Full supervised voice-pipeline and crash-recovery qualification remain open; HA still displays Add buttons after configuration, with duplicate creation blocked.
+- Fix LM Studio HTTP 400 errors for parameterless MCP tools ([#149](https://github.com/magnusoverli/opencode/issues/149)); thanks @AceMoneus for the detailed reproduction.
 - Document keyless Lemonade Server setup and compact MCP guidance; thanks @soulafein83 for suggesting it in [#147](https://github.com/magnusoverli/opencode/issues/147).
 - Expand the README's community contributor credits.
 

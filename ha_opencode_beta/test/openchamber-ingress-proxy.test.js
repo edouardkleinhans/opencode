@@ -760,11 +760,10 @@ describe("openchamber ingress proxy: disconnected clients", () => {
 });
 
 describe("openchamber ingress proxy: release parity", () => {
-  it("keeps shared forwarding identical apart from beta Assist route protection", () => {
+  it("keeps shared forwarding and Assist route protection identical across channels", () => {
     const stable = fs.readFileSync(STABLE_PROXY_SCRIPT, "utf8");
     const beta = fs.readFileSync(PROXY_SCRIPT, "utf8");
     assert.ok(beta.includes("/^\\/ha-(?:mcp|assist)(?:[/?]|$)/"));
-    const shared = beta.replace("/^\\/ha-(?:mcp|assist)(?:[/?]|$)/", "/^\\/ha-mcp(?:[/?]|$)/");
-    assert.equal(shared, stable);
+    assert.equal(beta, stable);
   });
 });

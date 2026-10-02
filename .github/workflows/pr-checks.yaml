@@ -69,7 +69,13 @@ jobs:
         working-directory: ha_opencode/rootfs/opt/opencode-v2-homeassistant
         run: npm ci --no-audit --no-fund && npm run verify:versions
 
+      - name: Install stable MCP dependencies for the shared Assist authentication boundary
+        working-directory: ha_opencode/rootfs/opt/ha-mcp-server
+        run: npm install --ignore-scripts --no-audit --no-fund
+
       - name: Stable add-on contract tests
+        env:
+          HA_ASSIST_BROWSER_EXECUTABLE: /usr/bin/google-chrome
         run: node --test "ha_opencode/test/*.test.js"
 
       - name: Stable external MCP root boundary
@@ -91,24 +97,34 @@ jobs:
           bash scripts/test-startup-hooks.sh beta
 
   ha-assist:
-    name: HA 2026.10 companion and pinned OpenCode contracts
+    name: HA 2026.10 companion and pinned OpenCode contracts (${{ matrix.channel }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - channel: beta
+            addon: ha_opencode_beta
+          - channel: stable
+            addon: ha_opencode
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v5
         with:
           node-version: 24.15.0
       - name: Install pinned OpenCode runtime
-        working-directory: ha_opencode_beta/rootfs/opt/opencode-v2-homeassistant
+        working-directory: ${{ matrix.addon }}/rootfs/opt/opencode-v2-homeassistant
         run: npm ci --no-audit --no-fund
       - name: Install shared Assist authentication dependencies
-        working-directory: ha_opencode_beta/rootfs/opt/ha-mcp-server
+        working-directory: ${{ matrix.addon }}/rootfs/opt/ha-mcp-server
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Exercise actual HA ChatLog and companion contracts
+        env:
+          ADDON_CHANNEL: ${{ matrix.channel }}
         run: node scripts/test-ha-assist-core.mjs
       - name: Verify companion packaging
-        run: python3 scripts/package-ha-assist.py "${RUNNER_TEMP}/opencode-assist.zip"
+        run: python3 scripts/package-ha-assist.py "${RUNNER_TEMP}/opencode-assist.zip" --channel "${{ matrix.channel }}"
 
   mcp-server:
     name: Home Assistant MCP server (${{ matrix.channel }})

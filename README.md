@@ -24,8 +24,10 @@
 
 ## 🚀 Getting Started
 
-🥳 **OpenCode 3.0 brings V2 to Home Assistant!** Enjoy a refreshed OpenChamber
-workspace and shared terminal/web conversations. Upgrading from 2.x? Read the
+🥳 **OpenCode 3.2 is here!** Includes OpenCode 2.0.22, OpenChamber 2.1.0,
+more efficient hab commands and opt-in experimental Assist conversations/AI tasks.
+See [what changed and how to enable Assist](ha_opencode/DOCS.md#upgrading-to-32).
+Upgrading from 2.x? Read the
 [short upgrade guide](ha_opencode/DOCS.md#upgrading-from-2x) before installing.
 
 > ⚙️ **Hardware requirement:** on x86-64, OpenCode needs a CPU with **SSE4.2** (Intel Nehalem/2008 or newer, AMD Bulldozer/2011 or Jaguar/2013 or newer). Older processors cannot run it at all — it exits with `Illegal instruction (core dumped)`. ARM64 is unaffected. See [CPU requirements][cpu-req] for details.

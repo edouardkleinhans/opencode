@@ -62,6 +62,9 @@ configuration:
     name: "Native MCP API ID"
     description: "Applies only when the native bridge above is on. The default 'assist' targets /api/mcp/assist; leave it empty to use every LLM API selected in the MCP Server integration. Any registered API ID is reachable from here: Home Assistant requires admin access for keyed IDs other than 'assist', and the Supervisor calls Home Assistant Core as its own admin system user."
 
+  ha_assist_enabled:
+    name: Native Assist and AI data tasks (experimental)
+    description: Install the bundled OpenCode Assist companion and enable its scoped adapter. Restart Home Assistant after installation or updates, then configure the discovered OpenCode Assist integration in Settings → Devices & services. Manual or edited integrations are preserved and reported as conflicts; disabling keeps installed files. Requires HA 2026.10; model usage may incur provider charges.
   ha_mcp_server_enabled:
     name: "Expose read-only MCP to Home Assistant"
     description: "Enable and restart, then confirm the discovered MCP integration in Home Assistant (app discovery targets Core 2026.10). HTTP and HTTPS work; no credentials are needed for new setups. Allows installation-wide state, device, area and calendar reads from the HA host network, including other host-network apps, not just Assist-exposed entities. No control/coding tools or host ports. Existing OAuth setups remain authenticated; independent of OpenCode's own MCP settings."

@@ -79,7 +79,7 @@ describe("bounded native V2 provider configuration", () => {
       { options: { baseURL: "https://user:secret@example.invalid" } },
       { options: { headers: { Authorization: "first\r\nsecond" } } },
       { models: { coding: { limit: { context: -1 } } } },
-      { models: { coding: { modalities: { input: ["unsupported"] } } } },
+      { models: { coding: { modalities: { input: [123] } } } },
       { models: { coding: { tool_call: "true" } } },
       { models: { coding: { variants: { hidden: { disabled: true } } } } },
       { models: { coding: { invented: fixtureKey } } },

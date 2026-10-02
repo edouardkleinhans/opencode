@@ -14,10 +14,10 @@
  * rejects with `extra keys not allowed @ data['__unparsedToolInput']`. See
  * home-assistant/core#176762.
  *
- * Dropping the empty member restores a schema clients can compile without
- * changing what the server accepts: the empty member added no constraint. On
- * Home Assistant 2026.8 and later the schemas already arrive clean and these
- * helpers are a no-op.
+ * Dropping the empty member narrows what the client can send. Apply this legacy
+ * compatibility workaround only to the affected unprefixed GetLiveContext tool;
+ * custom and modern tools may intentionally use unconstrained JSON schemas.
+ * Home Assistant 2026.10 uses probatio and domain-prefixed tool names.
  */
 
 const COMBINATOR_KEYS = ["anyOf", "oneOf", "allOf"];
@@ -114,7 +114,7 @@ export function sanitizeToolInputSchema(schema) {
 }
 
 /**
- * Repair the `inputSchema` of every tool in a `tools/list` result.
+ * Repair the known legacy GetLiveContext `inputSchema` in a `tools/list` result.
  *
  * Returns the (possibly rewritten) result plus how many tools were changed.
  * Anything that is not a recognizable tool list is passed through untouched so
@@ -128,7 +128,7 @@ export function sanitizeToolsListResult(result) {
   let repairedTools = 0;
   const repairedToolNames = [];
   const tools = result.tools.map((tool) => {
-    if (!isPlainObject(tool) || !isPlainObject(tool.inputSchema)) return tool;
+    if (!isPlainObject(tool) || tool.name !== "GetLiveContext" || !isPlainObject(tool.inputSchema)) return tool;
 
     const { schema, repaired } = sanitizeToolInputSchema(tool.inputSchema);
     if (!repaired) return tool;

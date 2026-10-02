@@ -17,14 +17,17 @@ export function createCommandOutputContent(toolName, command, output, options = 
   } catch { /* Plain-text CLI output. */ }
 
   if (rawJson !== undefined) {
+    const summary = parsed?.success === false ? `${toolName} command failed`
+      : parsed?.partial_result === true ? `${toolName} command returned partial results`
+      : `${toolName} command completed`;
     if (rawJson.length <= INLINE_MAX_CHARS) {
-      return content(`${toolName} command completed`, parsed,
+      return content(summary, parsed,
         { ...baseMeta, format: "json", truncated: false, original_chars: rawJson.length });
     }
 
     const truncated = truncateText(rawJson, { maxChars: INLINE_MAX_CHARS });
     const artifact = options.saveLargeOutput?.(`${rawJson}\n`, "json");
-    return content(`${toolName} command completed with large JSON output`,
+    return content(`${summary} with large JSON output`,
       { raw_json_preview: truncated.text },
       { ...baseMeta, format: "json", ...truncated, text: undefined,
         ...(artifact ? { full_output_path: artifact, full_output_format: "json" } : {}) });

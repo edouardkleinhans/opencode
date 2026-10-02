@@ -6,11 +6,11 @@ ARG NODE_VERSION=24.15.0
 # Bashio runtime as the final base, and copy an exact official Node toolchain in.
 FROM node:${NODE_VERSION}-trixie-slim AS node-runtime
 
-# OpenChamber's web preview is independently pinned; its desktop CLI is never
+# OpenChamber's web release is independently pinned; its desktop CLI is never
 # installed. Build against the upstream lock, on the target's native CI runner.
 FROM oven/bun:1.4.2-slim@sha256:cb3bbbb08e13a4a2ff400f24c7a2a1d5efa83f6ef8544d52d95a519631e2fc61 AS openchamber-bun
 FROM node-runtime AS openchamber-builder
-ARG OPENCHAMBER_REVISION=9fba129ddf968df1e5fb6916b84d3ceb35493198
+ARG OPENCHAMBER_REVISION=90726f9949da3408b2baf0f997e24bd71455946e
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git python3 g++ make \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=openchamber-bun /usr/local/bin/bun /usr/local/bin/bun
@@ -58,14 +58,16 @@ RUN --mount=type=bind,source=test/openchamber-request-body.mjs,target=/tmp/openc
 FROM --platform=$BUILDPLATFORM golang:1.24-trixie AS hab-builder
 
 ARG BUILD_ARCH
-ARG HAB_VERSION=1.6.4
-RUN git clone --depth 1 --branch "${HAB_VERSION}" https://github.com/balloob/home-assistant-build-cli.git /src
+ARG HAB_VERSION=1.7.2
+ARG HAB_REVISION=0bc138c6ab9f1bbe87914a0ffccbb038c0767e82
+RUN git clone --depth 1 --branch "${HAB_VERSION}" https://github.com/balloob/home-assistant-build-cli.git /src \
+    && test "$(git -C /src rev-parse HEAD)" = "${HAB_REVISION}"
 WORKDIR /src
 
 # Cross-compile for the target architecture
 RUN case "${BUILD_ARCH}" in amd64|aarch64) ;; *) echo "Unsupported BUILD_ARCH: ${BUILD_ARCH:-unset}" >&2; exit 1;; esac \
     && GOARCH=$([ "$BUILD_ARCH" = "aarch64" ] && echo "arm64" || echo "amd64") \
-    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /hab .
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X main.version=${HAB_VERSION}" -o /hab .
 
 ## Stage 2: Main add-on image
 FROM $BUILD_FROM AS runtime
@@ -80,8 +82,8 @@ ARG NODE_VERSION
 ARG ADDON_CHANNEL=stable
 ARG TTYD_VERSION=1.7.7
 # One pinned V2 runtime and its matching plugin API. No V1 runtime is installed.
-ARG OPENCODE_V2_VERSION=2.0.13
-ARG OPENCHAMBER_VERSION=2.0.0-preview.8
+ARG OPENCODE_V2_VERSION=2.0.22
+ARG OPENCHAMBER_VERSION=2.1.0
 ARG PPQ_PROXY_VERSION=0.1.0
 ARG TSX_VERSION=4.20.6
 ARG YQ_VERSION=v4.53.3
@@ -281,7 +283,8 @@ COPY --from=openchamber-builder /opt/openchamber-preview/node_modules /opt/openc
 COPY --from=openchamber-builder /opt/openchamber-preview/packages/web /opt/openchamber-preview/packages/web
 COPY --from=openchamber-builder /opt/openchamber-preview/packages/sdk /opt/openchamber-preview/packages/sdk
 COPY --from=openchamber-builder /opt/openchamber-preview/LICENSE /opt/openchamber-preview/LICENSE
-RUN printf '%s\n' "${OPENCHAMBER_VERSION}" > /usr/local/share/openchamber-certified-version
+RUN test "$(node -p 'require("/opt/openchamber-preview/packages/web/package.json").version')" = "${OPENCHAMBER_VERSION}" \
+    && printf '%s\n' "${OPENCHAMBER_VERSION}" > /usr/local/share/openchamber-certified-version
 
 # Copy root filesystem (server code, scripts, etc.)
 COPY rootfs /
@@ -291,7 +294,8 @@ RUN --mount=type=bind,source=test/v2-ui-lan-fixture.mjs,target=/tmp/v2-ui-lan-fi
     timeout --signal=TERM --kill-after=5s 45s node /tmp/v2-ui-lan-fixture.mjs
 
 # Make scripts executable and create runtime directories
-RUN chmod +x /usr/local/bin/* \
+RUN python3 -c 'import json; from pathlib import Path; p = Path("/opt/opencode-assist/custom_components/opencode_assist"); m = json.loads((p / "manifest.json").read_text()); assert m["domain"] == "opencode_assist" and m["version"]; assert (p / "config_flow.py").is_file()' \
+    && chmod +x /usr/local/bin/* \
     && chmod +x /opt/openchamber/patch-ingress.js \
     && chmod +x /etc/s6-overlay/s6-rc.d/init-opencode/run \
     && chmod +x /etc/s6-overlay/s6-rc.d/ha-opencode/run \
@@ -306,6 +310,7 @@ RUN chmod +x /usr/local/bin/* \
     && chmod +x /etc/s6-overlay/s6-rc.d/ha-openchamber-lan/run \
     && chmod +x /etc/s6-overlay/s6-rc.d/ha-opencode-server/run \
     && chmod +x /etc/s6-overlay/s6-rc.d/ha-facing-mcp/run \
+    && chmod +x /etc/s6-overlay/s6-rc.d/ha-assist/run \
     && chmod +x /etc/s6-overlay/s6-rc.d/ppq-private-proxy/run \
     && chmod +x /etc/profile.d/hab-esphome.sh \
     && chmod +x /etc/profile.d/zigporter-z2m.sh \
@@ -338,6 +343,12 @@ RUN set -e; \
 # injection on both supported architectures. It is not part of ordinary local image builds;
 # the Supervisor devcontainer separately covers the shipped s6 service graph.
 FROM runtime AS boundary-test
+RUN --network=none --mount=type=bind,source=test/hab-cli-fixture.mjs,target=/tmp/hab-cli-fixture.mjs,readonly \
+    timeout --signal=TERM --kill-after=10s 120s node /tmp/hab-cli-fixture.mjs
+
+RUN --network=none --mount=type=bind,source=test/v2-openchamber-browser.mjs,target=/tmp/v2-openchamber-browser.mjs,readonly \
+    timeout --signal=TERM --kill-after=10s 180s node /tmp/v2-openchamber-browser.mjs
+
 RUN --mount=type=bind,source=test/v2-boundary-fixture.sh,target=/tmp/v2-boundary-fixture.sh,readonly \
     --mount=type=bind,source=test/v2-caller-secret-plugin.js,target=/tmp/v2-caller-secret-plugin.js,readonly \
     --mount=type=bind,source=test/v2-caller-secret-native.py,target=/tmp/v2-caller-secret-native.py,readonly \
@@ -348,6 +359,16 @@ RUN --mount=type=bind,source=test/v2-boundary-fixture.sh,target=/tmp/v2-boundary
     timeout --signal=TERM --kill-after=10s 240s \
     bash /tmp/v2-boundary-fixture.sh \
     && timeout --signal=TERM --kill-after=10s 60s node /tmp/v2-zigbee-fixture.mjs
+
+RUN --mount=type=bind,source=test,target=/tmp/ha-assist/test,readonly \
+    ln -s / /tmp/ha-assist/rootfs \
+    && PYTHONDONTWRITEBYTECODE=1 python3 /tmp/ha-assist/test/assist-install.test.py \
+    && timeout --signal=TERM --kill-after=10s 120s node --test \
+        /tmp/ha-assist/test/opencode-v2-assist-adapter.test.js \
+        /tmp/ha-assist/test/opencode-v2-assist-discovery.test.js \
+        /tmp/ha-assist/test/opencode-v2-assist-notification.test.js \
+        /tmp/ha-assist/test/opencode-v2-assist-lifecycle.test.js \
+        /tmp/ha-assist/test/opencode-v2-assist-service.test.js
 
 FROM runtime AS final
 

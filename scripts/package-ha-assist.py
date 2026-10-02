@@ -1,4 +1,4 @@
-"""Build a deterministic companion ZIP for a beta release (no live HA access)."""
+"""Build a deterministic companion ZIP for the selected release channel."""
 
 import argparse
 import hashlib
@@ -10,8 +10,10 @@ import zipfile
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path, help="Destination ZIP path")
+    parser.add_argument("--channel", choices=("stable", "beta"), default="beta")
     args = parser.parse_args()
-    source = Path(__file__).resolve().parent.parent / "ha_opencode_beta/rootfs/opt/opencode-assist/custom_components/opencode_assist"
+    addon = "ha_opencode" if args.channel == "stable" else "ha_opencode_beta"
+    source = Path(__file__).resolve().parent.parent / addon / "rootfs/opt/opencode-assist/custom_components/opencode_assist"
     manifest = json.loads((source / "manifest.json").read_text())
     if manifest["domain"] != "opencode_assist" or not manifest.get("version"):
         raise ValueError("Invalid companion manifest")

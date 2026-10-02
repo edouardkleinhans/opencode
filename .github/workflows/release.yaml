@@ -153,6 +153,9 @@ jobs:
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: Package the matching optional HA companion
+        run: python3 scripts/package-ha-assist.py "${RUNNER_TEMP}/opencode-assist.zip" --channel stable
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
@@ -161,3 +164,4 @@ jobs:
           body: ${{ steps.changelog.outputs.content }}
           draft: false
           prerelease: false
+          files: ${{ runner.temp }}/opencode-assist.zip

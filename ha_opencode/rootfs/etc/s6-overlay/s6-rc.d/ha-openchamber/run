@@ -4,7 +4,7 @@ if [ "$(cat /data/.interface_mode)" != openchamber ]; then
     exec sleep infinity
 fi
 mkdir -p /data/.config/openchamber
-bashio::log.info "Starting pinned OpenChamber V2 preview on the existing managed backend"
+bashio::log.info "Starting pinned OpenChamber V2 on the existing managed backend"
 exec env -i PATH="/usr/local/bin:/usr/bin:/bin" HOME="/data" LANG="C.UTF-8" \
     NODE_OPTIONS="--max-old-space-size=768" \
     LD_PRELOAD="/usr/local/lib/opencode-v2-non-dumpable.so" \

@@ -97,6 +97,19 @@ const MUTATING_TOOLS = [
 ];
 
 describe("MCP tool-profile enforcement", () => {
+  it.each([
+    ["compact", ["get_config", "get_agent_capabilities", "get_areas", "get_calendars", "get_suggestions", "get_supervisor_health"]],
+    ["configuration", ["get_config", "get_agent_capabilities", "get_areas", "validate_config", "get_calendars", "get_suggestions", "get_supervisor_health"]],
+    ["full", ["get_config", "get_agent_capabilities", "get_areas", "validate_config", "get_calendars", "get_suggestions", "get_supervisor_health", "get_running_jobs"]],
+  ])("advertises explicit empty properties for parameterless tools in %s", async (profile, names) => {
+    const { tools } = await request(profile, { method: "tools/list", params: {} });
+    for (const name of names) {
+      const tool = tools.find((entry) => entry.name === name);
+      expect(tool, `${name} is missing from the ${profile} profile`).toBeDefined();
+      expect(tool.inputSchema).toEqual({ type: "object", properties: {}, additionalProperties: false });
+    }
+  }, TIMEOUT_MS + 5000);
+
   it("advertises only scoped tools and rejects a hidden tool before dispatch", async () => {
     const compact = await request("compact", { method: "tools/list", params: {} });
     const compactNames = compact.tools.map((tool) => tool.name);

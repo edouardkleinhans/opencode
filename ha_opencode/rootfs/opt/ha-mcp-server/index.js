@@ -108,6 +108,8 @@ import { createSupervisorAppsClient } from "./lib/supervisor-apps.js";
 import { setRegistryArea } from "./lib/registry-area.js";
 import { saveHabOutput } from "./lib/hab-output.js";
 import { createCommandOutputContent } from "./lib/command-output.js";
+import { HAB_MAX_OUTPUT_BYTES, prepareHabRequest, formatHabExecution } from "./lib/hab-cli.js";
+import { discoverNativeLlmApis } from "./lib/ha-llm-apis.js";
 import {
   ESPHomeDeviceBuilderClient,
   createESPHomeConfig,
@@ -1835,7 +1837,7 @@ async function fetchHARepairs() {
  * Run a single HA WebSocket API command (auth, send, close).
  * Used for registry dumps that have no REST equivalent.
  */
-function callHAWebSocketCommand(commandType, timeoutMs = 5000, url = "ws://supervisor/core/websocket", fields = {}) {
+function callHAWebSocketCommand(commandType, timeoutMs = 5000, url = SUPERVISOR_WEBSOCKET_URL.toString(), fields = {}) {
   return new Promise((promiseResolve, promiseReject) => {
     const requestSignal = getRequestSignal();
     let settled = false;
@@ -1852,7 +1854,7 @@ function callHAWebSocketCommand(commandType, timeoutMs = 5000, url = "ws://super
     };
     const onAbort = () => settle(promiseReject, cancellationError(requestSignal.reason));
     const timeout = setTimeout(() => {
-      settle(promiseReject, new Error(`WebSocket command '${commandType}' timed out`));
+      settle(promiseReject, Object.assign(new Error(`WebSocket command '${commandType}' timed out`), { code: "timeout" }));
     }, timeoutMs);
 
     let ws;
@@ -1877,12 +1879,15 @@ function callHAWebSocketCommand(commandType, timeoutMs = 5000, url = "ws://super
         } else if (msg.type === "auth_ok") {
           ws.send(JSON.stringify({ ...fields, id: 1, type: commandType }));
         } else if (msg.type === "auth_invalid") {
-          settle(promiseReject, new Error("WebSocket authentication failed"));
-        } else if (msg.type === "result") {
+          settle(promiseReject, Object.assign(new Error("WebSocket authentication failed"), { code: "auth_invalid" }));
+        } else if (msg.type === "result" && msg.id === 1) {
           if (msg.success) {
             settle(promiseResolve, msg.result);
           } else {
-            settle(promiseReject, new Error(msg.error?.message || `WebSocket command '${commandType}' failed`));
+            settle(promiseReject, Object.assign(
+              new Error(msg.error?.message || `WebSocket command '${commandType}' failed`),
+              { code: msg.error?.code },
+            ));
           }
         }
       } catch (_) { /* ignore parse errors, wait for timeout */ }
@@ -1890,6 +1895,9 @@ function callHAWebSocketCommand(commandType, timeoutMs = 5000, url = "ws://super
 
     ws.on("error", (error) => {
       settle(promiseReject, error);
+    });
+    ws.on("close", () => {
+      settle(promiseReject, new Error("Home Assistant closed the WebSocket before the command completed"));
     });
   });
 }
@@ -2314,6 +2322,7 @@ function formatNoteForDisplay(note) {
 
 const EMPTY_INPUT_SCHEMA = Object.freeze({
   type: "object",
+  properties: {},
   additionalProperties: false,
 });
 
@@ -2683,7 +2692,7 @@ const TOOLS = [
   {
     name: "get_agent_capabilities",
     title: "Get Agent Capability Status",
-    description: "Summarize OpenCode's current Home Assistant agent capabilities and detect whether the running Home Assistant instance exposes the native llm component and native MCP endpoints such as /api/mcp/<API ID>. Use this when deciding how to combine OpenCode MCP tools with Home Assistant's emerging native LLM platform.",
+    description: "Report Home Assistant agent capabilities, discover registered native LLM API IDs and names (HA 2026.9+), check the saved API selection, and probe native MCP endpoints. Registry discovery is read-only and separate from endpoint readiness and bridge enablement. Use this to find a custom API ID or diagnose native MCP setup.",
     inputSchema: EMPTY_INPUT_SCHEMA,
     annotations: {
       readOnly: true,
@@ -3903,16 +3912,30 @@ const TOOLS = [
   {
     name: "hab_run",
     title: "Run hab CLI Command",
-    description: "Run a Home Assistant Builder (hab) CLI command for dashboards, area/floor/zone/label/person/category management, helpers, backups, blueprints, calendars, todo lists, notifications, integrations, repairs, events, templates, devices, and search. Automation/script/scene API CRUD is available when specifically needed, but configuration edits default to YAML + write_config_safe followed by an approved domain reload via call_service and read-only verification. Needing a reload is not a reason to switch to API editing. Check 'automation --help' and subcommand help for supported payload/file options; do not guess flags or improvise JSON quoting. Output is human-readable by default; add --json for structured output. When meta.truncated is true, meta.full_output_path contains the complete temporary output; never write a dashboard reconstructed from the preview. Examples: 'entity list --domain light --json', 'area create Kitchen', 'integration reload hue', 'repairs list --json'. Run 'help' for command groups.",
+    description: "Run pinned hab 1.7.2 for dashboards, helpers, registries and HA administration. Prefer args to preserve literal JSON/templates. ['schema'] gives compact discovery; ['schema','--index','--search','dashboard patch','--limit','10'] searches commands (follow next_offset until complete). ['schema',...commandPath] returns native compact payload/output contracts; ['guide','list'] lists topics. Prefer dashboard patch for field edits: inspect its --plan diff, then apply with the exact base_revision as --if-match. Check status/saved/verified or error.details.result; no blind retry of conflicts or uncertain saves. Verification proves stored JSON, not rendering; HA has no atomic conditional save. Other --plan modes may be static. Annotations never grant permission. Read before changes; YAML uses write_config_safe and approved reload. Check nested success/error/partial_result/warnings. Timeout leaves the outcome unverified. Large results provide meta.full_output_path; never reconstruct from a preview. Use dedicated ESPHome tools for long-running work.",
     inputSchema: {
       type: "object",
       properties: {
         command: {
           type: "string",
-          description: "The hab command and arguments to run (without the 'hab' prefix). Examples: 'entity list --json', 'area create Kitchen', 'dashboard list', 'automation get my-automation', 'helper create input_boolean --name \"Guest Mode\"', 'scene list --json', 'todo item add todo.shopping \"Buy milk\"', 'notification list --json', 'integration reload hue', 'repairs list --json', 'person list --json', 'backup create', 'system info', 'overview --json'",
+          description: "Legacy quoted command string without the hab prefix. Provide this or args, never both. No shell expansion or pipelines.",
+          maxLength: 262144,
+        },
+        args: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 1,
+          maxItems: 256,
+          description: "Preferred argv array without hab. Examples: ['schema','dashboard','card','update'], ['entity','list','--domain','light','--brief','--limit','20'], ['helper','input-boolean','create','Guest Mode']. Each payload is one literal argument.",
+        },
+        timeout_seconds: {
+          type: "integer",
+          minimum: 1,
+          maximum: 120,
+          default: 60,
+          description: "Bounded process deadline, default 60 seconds including HA reload waits. A timed-out mutation requires read-back before retry.",
         },
       },
-      required: ["command"],
       additionalProperties: false,
     },
     annotations: {
@@ -4050,7 +4073,7 @@ const RESOURCES = [
     uri: "ha://agent/capabilities",
     name: "agent_capabilities",
     title: "Agent Capabilities",
-    description: "OpenCode MCP capabilities and Home Assistant native LLM readiness status",
+    description: "OpenCode MCP capabilities, registered Home Assistant LLM API IDs, saved selection and native MCP readiness",
     mimeType: "application/json",
   },
   {
@@ -4180,6 +4203,10 @@ async function getAgentCapabilities() {
 
 async function probeNativeHaMcpReadiness() {
   const signal = getRequestSignal();
+  const discovery = discoverNativeLlmApis(
+    (type) => callHAWebSocketCommand(type, NATIVE_MCP_PROBE_TIMEOUT_MS),
+    { signal },
+  );
   const baseProbe = probeNativeMcpEndpoint({
     supervisorToken: SUPERVISOR_TOKEN,
     baseUrl: SUPERVISOR_API,
@@ -4205,7 +4232,7 @@ async function probeNativeHaMcpReadiness() {
       signal,
     });
 
-  const [base, configured, assist] = await Promise.all([baseProbe, configuredProbe, assistProbe]);
+  const [base, configured, assist, apiDiscovery] = await Promise.all([baseProbe, configuredProbe, assistProbe, discovery]);
 
   return {
     upstream: {
@@ -4216,12 +4243,15 @@ async function probeNativeHaMcpReadiness() {
       llm_docs_pr: "home-assistant/developers.home-assistant#3236",
       tool_platform_docs_pr: "home-assistant/developers.home-assistant#3201",
       first_release: "2026.8.0",
+      api_list_pr: "home-assistant/core#177903",
+      api_list_first_release: "2026.9.0",
       endpoint_pattern: "/api/mcp/<API ID>",
       configured_endpoint: "/api/mcp",
       assist_api_id: NATIVE_MCP_ASSIST_API_ID,
     },
     configured_api_id: HA_NATIVE_MCP_API_ID,
     configured_endpoint_mode: HA_NATIVE_MCP_API_ID ? "keyed_api" : "configured_api",
+    api_discovery: apiDiscovery,
     base,
     configured,
     assist,
@@ -6972,31 +7002,14 @@ async function handleToolCall(request) {
 
       // === HAB CLI INTEGRATION ===
       case "hab_run": {
-        const { command } = args;
-        if (!command || typeof command !== "string") {
-          throw new Error("command parameter is required and must be a string");
-        }
-        
-        // Security: block dangerous commands
-        const lowerCmd = command.toLowerCase().trim();
-        if (lowerCmd.startsWith("auth ") || lowerCmd === "auth") {
-          throw new Error("Auth commands are not needed - hab is pre-authenticated via Supervisor token.");
-        }
-        if (lowerCmd.startsWith("update") && !lowerCmd.startsWith("update ")) {
-          throw new Error("Self-update of hab is not supported inside the container. hab is updated with the add-on.");
-        }
-        
-        // Parse command string into args array for execFile (safe, no shell injection)
-        const cmdArgs = command.match(/(?:[^\s"']+|"[^"]*"|'[^']*')/g) || [];
-        // Strip quotes from args
-        const cleanArgs = cmdArgs.map(arg => arg.replace(/^["']|["']$/g, ""));
-        sendLog("info", "hab", { action: "run_command", argument_count: cleanArgs.length });
+        const request = prepareHabRequest(args);
+        sendLog("info", "hab", { action: "run_command", command: request.root, argument_count: request.argv.length });
         
         // For esphome subcommands, pre-discover the ESPHome ingress URL so
         // hab can skip its own (broken direct-connection) discovery and route
         // through the Supervisor ingress proxy instead.
         let esphomeEnv = {};
-        if (lowerCmd.startsWith("esphome ") || lowerCmd === "esphome") {
+        if (request.root === "esphome" && !request.argv.some((value) => ["--help", "-h", "--help=true"].includes(value))) {
           if (!HA_ACCESS_TOKEN) {
             throw new Error(ESPHOME_TOKEN_ERROR);
           }
@@ -7017,15 +7030,15 @@ async function handleToolCall(request) {
           }
         }
         
-        let result;
+        let result, failure;
         try {
-          result = await runCancellableExecFile("/usr/local/bin/hab", cleanArgs, {
-            timeoutMs: 30000,
-            maxBuffer: 1024 * 1024,
+          result = await runCancellableExecFile("/usr/local/bin/hab", request.argv, {
+            timeoutMs: request.timeoutMs,
+            maxBuffer: HAB_MAX_OUTPUT_BYTES,
             env: {
               ...process.env,
               SUPERVISOR_TOKEN,
-              HAB_URL: "http://supervisor/core",
+              HAB_URL: `${SUPERVISOR_BASE_URL}/core`,
               HAB_TOKEN: SUPERVISOR_TOKEN,
               ...(HA_ACCESS_TOKEN ? { HA_ACCESS_TOKEN } : {}),
               ...esphomeEnv,
@@ -7033,15 +7046,14 @@ async function handleToolCall(request) {
           });
         } catch (error) {
           throwIfRequestCancelled();
-          throw new Error(`hab command failed: ${error.stdout || error.stderr || error.message}`);
+          failure = error;
+          result = error.stdout || "";
         }
         
-        return makeCompatibleResponse({
-          content: [createCommandOutputContent("hab", command, result, {
+        return makeCompatibleResponse(formatHabExecution(request, result, failure, {
             audience: ["user", "assistant"], priority: 0.7,
             saveLargeOutput: saveHabOutput,
-          })],
-        });
+        }));
       }
 
       // === ZIGPORTER CLI INTEGRATION ===
