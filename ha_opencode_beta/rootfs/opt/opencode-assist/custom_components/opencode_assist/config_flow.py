@@ -72,6 +72,17 @@ class OpenCodeFlow(ConfigFlow, domain=DOMAIN):
         self._selected_slug = app.slug
         self.context["title_placeholders"] = {"name": app.name}
         self.context["configuration_url"] = f"homeassistant://hassio/addon/{app.slug}/info"
+        return await self.async_step_choose_entity()
+
+    async def async_step_choose_entity(self, user_input=None):
+        return self.async_show_menu(step_id="choose_entity", menu_options=["conversation", "ai_task_data"])
+
+    async def async_step_conversation(self, user_input=None):
+        self._initial_subentry = "conversation"
+        return await self.async_step_hassio_confirm()
+
+    async def async_step_ai_task_data(self, user_input=None):
+        self._initial_subentry = "ai_task_data"
         return await self.async_step_hassio_confirm()
 
     async def async_step_hassio_confirm(self, user_input=None):
@@ -97,19 +108,12 @@ class OpenCodeFlow(ConfigFlow, domain=DOMAIN):
                         data = {CONF_URL: app.url, CONF_API_KEY: self._auto_key, CONF_ADDON_SLUG: app.slug}
                         if self._auto_entry is not None:
                             return self.async_update_and_abort(self._auto_entry, data={**self._auto_entry.data, **data})
-                        self._initial_subentry = user_input.get("entity_type", "conversation")
                         return self.async_create_entry(title=app.name, data=data)
             except AssistAuthError:
                 errors["base"] = "discovery_expired"
             except (HomeAssistantError, ValueError):
                 errors["base"] = "cannot_connect"
-        schema = probatio.Schema({}) if self._auto_entry else probatio.Schema({
-            probatio.Required("entity_type", default="conversation"): SelectSelector(SelectSelectorConfig(options=[
-                {"value": "conversation", "label": "Conversation agent"},
-                {"value": "ai_task_data", "label": "AI data task"},
-            ])),
-        })
-        return self.async_show_form(step_id="hassio_confirm", data_schema=schema, errors=errors)
+        return self.async_show_form(step_id="hassio_confirm", data_schema=probatio.Schema({}), errors=errors)
 
     async def async_on_create_entry(self, result):
         entry = result["result"]

@@ -7,13 +7,13 @@ import tempfile
 import time
 import unittest
 from types import MappingProxyType, SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID
 
 import aiohttp
 import probatio
 from aiohasupervisor import SupervisorError
-from homeassistant.components import conversation, ai_task
+from homeassistant.components import conversation, ai_task, persistent_notification
 from aiohasupervisor.models import Discovery
 from homeassistant.config_entries import ConfigEntries, ConfigSubentry, ConfigEntryState, FlowType
 from homeassistant.core import Context, HomeAssistant
@@ -163,6 +163,26 @@ class ContractTests(unittest.IsolatedAsyncioTestCase):
             await async_remove_entry(hass, self.entry)
         self.client.revoke.assert_awaited_once()
 
+    @unittest.skipUnless(os.environ.get("ASSIST_FIXTURE_NOTIFICATION"), "Run scripts/test-ha-assist-core.mjs for the worker's notification payload")
+    async def test_restart_notification_service_replaces_duplicates_and_clears_on_core_restart(self):
+        data = json.loads(os.environ["ASSIST_FIXTURE_NOTIFICATION"])
+        await persistent_notification.async_setup(self.hass, {})
+        for _ in range(2):
+            await self.hass.services.async_call("persistent_notification", "create", data, blocking=True)
+        def notifications(hass):
+            connection = SimpleNamespace(send_message=Mock())
+            persistent_notification.websocket_get_notifications(hass, connection, {"id": 1, "type": "persistent_notification/get"})
+            return connection.send_message.call_args.args[0]["result"]
+        self.assertEqual(len(notifications(self.hass)), 1)
+        self.assertIn("Restart Home Assistant Core", notifications(self.hass)[0]["message"])
+        await self.hass.async_stop()
+        restarted = HomeAssistant(self.temp.name)
+        try:
+            await persistent_notification.async_setup(restarted, {})
+            self.assertEqual(notifications(restarted), [])
+        finally:
+            await restarted.async_stop()
+
     @unittest.skipUnless(os.environ.get("ASSIST_FIXTURE_URL"), "Run scripts/test-ha-assist-core.mjs for pinned OpenCode + HA transport")
     async def test_real_opencode_transport_and_followup(self):
         async with aiohttp.ClientSession() as session:
@@ -249,10 +269,14 @@ class OnboardingContracts(unittest.IsolatedAsyncioTestCase):
         return await self.hass.config_entries.flow.async_init("opencode_assist", context={"source": source}, data=data)
 
     async def create(self, entity_type="conversation"):
-        form = await self.start()
+        menu = await self.start()
+        self.assertEqual(menu["step_id"], "choose_entity")
+        self.assertEqual(menu["type"], "menu")
+        self.client.onboard.assert_not_awaited()
+        form = await self.hass.config_entries.flow.async_configure(menu["flow_id"], {"next_step_id": entity_type})
         self.assertEqual(form["step_id"], "hassio_confirm")
         self.client.onboard.assert_not_awaited()
-        return await self.hass.config_entries.flow.async_configure(form["flow_id"], {"entity_type": entity_type})
+        return await self.hass.config_entries.flow.async_configure(form["flow_id"], {})
 
     async def test_discovery_confirmation_chains_real_model_api_flow(self):
         result = await self.create()
@@ -282,14 +306,21 @@ class OnboardingContracts(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.hass.config_entries.async_entries("opencode_assist")), 1)
 
     async def test_ai_task_chaining_and_supervisor_start_from_add_integration(self):
-        form = await self.start("user")
+        menu = await self.start("user")
+        self.assertEqual(menu["step_id"], "choose_entity")
+        form = await self.hass.config_entries.flow.async_configure(menu["flow_id"], {"next_step_id": "ai_task_data"})
         self.assertEqual(form["step_id"], "hassio_confirm")
-        result = await self.hass.config_entries.flow.async_configure(form["flow_id"], {"entity_type": "ai_task_data"})
+        result = await self.hass.config_entries.flow.async_configure(form["flow_id"], {})
         form = await self.hass.config_entries.subentries.async_configure(result["next_flow"][1])
         values = form["data_schema"]({"model": "fixture/coding"})
         self.assertNotIn("llm_hass_api", values)
         await self.hass.config_entries.subentries.async_configure(form["flow_id"], values)
         self.assertEqual(next(iter(result["result"].subentries.values())).subentry_type, "ai_task_data")
+        # Choosing AI tasks first never excludes adding conversation later.
+        additional = await self.hass.config_entries.subentries.async_init(
+            (result["result"].entry_id, "conversation"), context={"source": "user"})
+        await self.hass.config_entries.subentries.async_configure(additional["flow_id"], {"model": "fixture/coding", "llm_hass_api": []})
+        self.assertEqual({entry.subentry_type for entry in result["result"].subentries.values()}, {"ai_task_data", "conversation"})
 
     async def test_backend_lost_before_subentry_keeps_entry_without_broken_next_flow(self):
         self.client.info.side_effect = HomeAssistantError("fixture offline")
@@ -299,25 +330,26 @@ class OnboardingContracts(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.hass.config_entries.async_entries("opencode_assist")), 1)
 
     async def test_refresh_after_expiry_empty_models_and_lost_pairing_response(self):
-        form = await self.start()
+        menu = await self.start()
+        form = await self.hass.config_entries.flow.async_configure(menu["flow_id"], {"next_step_id": "conversation"})
         flow_id = form["flow_id"]
         self.client.onboard.side_effect = AssistAuthError("expired")
-        result = await self.hass.config_entries.flow.async_configure(flow_id, {"entity_type": "conversation"})
+        result = await self.hass.config_entries.flow.async_configure(flow_id, {})
         self.assertEqual(result["errors"]["base"], "discovery_expired")
         self.app.bootstrap = "c" * 43
         self.client.onboard.side_effect = None
         self.client.onboard.return_value = {"version": 1, "models": []}
-        result = await self.hass.config_entries.flow.async_configure(flow_id, {"entity_type": "conversation"})
+        result = await self.hass.config_entries.flow.async_configure(flow_id, {})
         self.assertEqual(result["errors"]["base"], "no_models")
         self.assertTrue(all(not call.args for call in self.client.onboard.await_args_list))
         self.client.onboard.side_effect = [self.info, HomeAssistantError("response lost")]
-        result = await self.hass.config_entries.flow.async_configure(flow_id, {"entity_type": "conversation"})
+        result = await self.hass.config_entries.flow.async_configure(flow_id, {})
         self.assertEqual(result["errors"]["base"], "cannot_connect")
         attempted_key = self.client.onboard.await_args.args[0]
         self.app.bootstrap = "d" * 43
         self.client.onboard.side_effect = None
         self.client.onboard.return_value = self.info
-        result = await self.hass.config_entries.flow.async_configure(flow_id, {"entity_type": "conversation"})
+        result = await self.hass.config_entries.flow.async_configure(flow_id, {})
         self.assertEqual(result["result"].data["api_key"], attempted_key)
         self.mocks[6].assert_called_with(None, self.app.url, "d" * 43)
 
@@ -327,7 +359,7 @@ class OnboardingContracts(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(form["errors"]["base"], "no_apps")
         self.mocks[4].return_value = [self.app]
         form = await self.hass.config_entries.flow.async_configure(form["flow_id"], {})
-        self.assertEqual(form["step_id"], "hassio_confirm")
+        self.assertEqual(form["step_id"], "choose_entity")
         duplicate = await self.start()
         self.assertEqual(duplicate["reason"], "already_in_progress")
         self.hass.config_entries.flow.async_abort(form["flow_id"])
@@ -335,7 +367,7 @@ class OnboardingContracts(unittest.IsolatedAsyncioTestCase):
         form = await self.start("user")
         self.assertEqual(form["step_id"], "supervisor")
         form = await self.hass.config_entries.flow.async_configure(form["flow_id"], {"addon_slug": self.app.slug})
-        self.assertEqual(form["step_id"], "hassio_confirm")
+        self.assertEqual(form["step_id"], "choose_entity")
         self.client.onboard.assert_not_awaited()
 
     async def test_reauth_and_reconfigure_renew_in_place_without_subentry_loss(self):

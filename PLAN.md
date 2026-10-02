@@ -4,6 +4,45 @@ Updated: 2026-10-02. This is the single shared plan for this work, tracked in Gi
 Only open tasks appear as checkboxes; close them with concrete evidence and keep
 the remaining list current instead of accumulating historical plans.
 
+## Assist setup explanations and restart notification — beta 3.2.0b3
+
+- User requested short explanations below both onboarding choices, a note that
+  both types can be added one at a time, and an HA restart notification after
+  companion installation/update.
+- Companion **0.1.0b4** uses HA's native config-flow menu with translated secondary
+  descriptions. The radio selector in HA 2026.10 supports labels only; the native
+  menu supports `menu_option_descriptions` beneath each label. Selection opens
+  the existing explicit pairing confirmation, then model/API configuration.
+- The app uses HA's supported `persistent_notification.create` action through
+  Supervisor's Core proxy. A private atomic delivery receipt keyed by companion
+  version and installation time prevents duplicates across ordinary app/worker
+  restarts. A stable notification ID replaces an older update notice. Failures
+  retry with bounded backoff; notification is attempted before backend readiness
+  so an OpenCode startup failure does not hide the installed companion update.
+- Core owns notification clearing on restart; no restart request is sent. A late
+  delivery includes the installation time and asks users who already restarted
+  after it to dismiss the reminder. This avoids claiming that receipt of a
+  notification proves which Python modules Core has loaded.
+- Sources: [HA app communication](https://developers.home-assistant.io/docs/apps/communication/),
+  [persistent notifications](https://www.home-assistant.io/integrations/persistent_notification/),
+  HA frontend [20260930.0 native menu](https://github.com/home-assistant/frontend/blob/20260930.0/src/dialogs/config-flow/step-flow-menu.ts).
+- Verification: beta Node suite passed, including mobile Chromium in both Ingress
+  modes; all **15 actual HA 2026.10.0b0 contracts** passed, including both entity
+  choices, adding the other entity later, renewal and notification replacement/
+  clearing on Core restart. HA's real translation loader returns the menu title,
+  introduction and both secondary descriptions from the shipped English file;
+  pinned frontend 20260930.0 renders these as multiline secondary text.
+- Native amd64 boundary image `opencode-beta:assist-ui-notice-local` passed the
+  existing runtime checks, **10 installer tests** and **23 Assist tests** on
+  Node 24.15.0/OpenCode 2.0.13. Image config digest:
+  `sha256:90d3664ee3f595a5e7255a770ed6590924d210af7be2535d7d4a2911f6f90c6d`.
+- Release companion package: `/tmp/opencode/ha-release-artifacts-3.2.0b3/opencode-assist.zip`, SHA256
+  `ec21e4c162fa2f77bd8eed94a133f08f0d31a358f506b99974163b1517f05633`.
+  Supervised HA/voice-pipeline and physical iOS acceptance remain pending.
+- User approved committing, pushing and releasing **3.2.0b3**. Publish and verify
+  both native architecture images before tagging so the release workflow can
+  advance the HA storefront from b2 to b3 with images already available.
+
 ## Assist fixes and Supervisor-native onboarding — beta 3.2.0b2
 
 - Published [beta 3.2.0b2](https://github.com/magnusoverli/opencode/releases/tag/beta-v3.2.0b2)

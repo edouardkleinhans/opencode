@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## 3.2.0b3
+
+- Explain both Assist setup choices beneath their labels and clarify that both can be added, one at a time.
+- Notify Home Assistant when its bundled Assist companion is installed or updated and needs a Core restart, without repeating the reminder on ordinary app restarts.
+- Retry notification delivery while HA is unavailable; subsequent updates replace the same notice, and HA clears it on Core restart. A delayed reminder can be dismissed if Core was already restarted after the displayed installation time.
+- Bundle companion **0.1.0b4**. After updating the app, restart **Home Assistant Core** to load the new setup flow; restarting only the app is not sufficient. Existing Supervisor pairings and configured entities are retained. Requires HA 2026.10 with Supervisor; native Assist remains experimental ([#45](https://github.com/magnusoverli/opencode/issues/45)).
+
 ## 3.2.0b2
 
 - Replace manual Assist URL/key pairing with Supervisor discovery, automatic scoped credentials, and HA confirmation followed by model/API selection; recreate old experimental entries through discovery.

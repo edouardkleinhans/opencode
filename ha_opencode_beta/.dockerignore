@@ -22,6 +22,7 @@ rootfs/opt/*/README.md
 !test/v2-lan-fixture.mjs
 !test/opencode-v2-assist-adapter.test.js
 !test/opencode-v2-assist-discovery.test.js
+!test/opencode-v2-assist-notification.test.js
 !test/opencode-v2-assist-service.test.js
 !test/opencode-v2-assist-lifecycle.test.js
 !test/assist-install.test.py

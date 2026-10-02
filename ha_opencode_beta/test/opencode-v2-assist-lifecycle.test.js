@@ -76,6 +76,22 @@ test("worker shutdown aborts an in-flight Supervisor publication before unlockin
   } finally { await service?.close(); await rm(directory, { recursive: true, force: true }); }
 });
 
+test("a newly installed companion notifies HA even when the OpenCode backend cannot start", { skip: !supported }, async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "assist-notification-start-"));
+  const settings = { ...options(directory), supervisorToken: "fixture-supervisor",
+    installation: { action: "updated", version: "0.1.0b4", installed_at: "2026-10-02T10:00:00Z" },
+    createClient: async () => { throw new Error("fixture backend unavailable"); } };
+  const urls = [];
+  t.mock.method(globalThis, "fetch", async (url) => { urls.push(url); return Response.json([]); });
+  try {
+    await assert.rejects(launchAssist(settings), /fixture backend unavailable/);
+    assert.deepEqual(urls, ["http://supervisor/core/api/services/persistent_notification/create"]);
+    await (await acquireStateLock(settings.stateDirectory))();
+    await assert.rejects(launchAssist(settings), /fixture backend unavailable/);
+    assert.equal(urls.length, 1, "s6 retries never duplicate a delivered reminder");
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
 for (const signal of ["SIGTERM", "SIGINT", "both"]) {
   test(`Assist supervised worker exits cleanly on ${signal} and releases its lock`, { skip: !supported, timeout: 15000 }, async () => {
     const directory = await mkdtemp(join(tmpdir(), "assist-signal-"));

@@ -1,7 +1,8 @@
 # OpenCode Assist companion (experimental)
 
-Targets **Home Assistant 2026.10 with Supervisor**. Companion **0.1.0b3** uses
-Supervisor-only onboarding in beta **3.2.0b2**, replacing 3.2.0b1's manual pairing.
+Targets **Home Assistant 2026.10 with Supervisor**. Companion **0.1.0b4** in beta **3.2.0b3**
+adds descriptive setup choices and an HA restart notification to the
+Supervisor-only onboarding introduced in beta **3.2.0b2**.
 
 1. Configure a supported provider/model in OpenCode. Enable `ha_assist_enabled`
    in the beta app options and restart the app. It installs the bundled companion
@@ -10,8 +11,10 @@ Supervisor-only onboarding in beta **3.2.0b2**, replacing 3.2.0b1's manual pairi
    HA must reload custom integration code. This interrupts HA automations and
    Assist while Core restarts; the app never initiates that restart automatically.
 3. In **Settings → Devices & services**, configure the discovered **OpenCode
-   Assist** app. Confirm the connection and choose a **Conversation agent** or
-   **AI data task**. Supervisor supplies the connection details and an expiring
+   Assist** app. Choose a **Conversation agent** for Assist voice/text conversations
+   or an **AI data task** for generated text/structured data in automations and
+   scripts, then confirm the connection. You can add both, one at a time.
+   Supervisor supplies the connection details and an expiring
    bootstrap; HA generates and exchanges a scoped key automatically. Nothing
    needs copying. **Add integration → OpenCode Assist** finds the same app.
 4. HA opens model/API selection as the next step. Choose a model and, for
@@ -30,6 +33,14 @@ be removed and recreated through discovery; no migration or manual pairing form
 is provided. Disabling `ha_assist_enabled` stops the adapter and withdraws its
 advertisement but leaves installed files, pairing and HA configuration intact.
 Normal restarts and rediscovery keep the same pairing and subentries.
+
+When companion files are installed or updated, the app creates a notification in
+HA's **Notifications** panel with the companion version, installation time and
+Core-restart guidance. It retries while HA is unavailable and uses one notification
+ID, so subsequent updates replace the notice. A delivery receipt prevents ordinary
+app/worker restarts from repeating it. HA clears notifications on Core restart;
+if delivery was delayed until after you already restarted, dismiss the reminder.
+No automatic Core restart is performed.
 
 The administrator-only **Set up OpenCode Assist** link in both Ingress modes
 provides status, installation/restart guidance and a link to HA setup, including

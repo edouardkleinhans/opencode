@@ -2,7 +2,7 @@
 
 This is the **beta channel** for the OpenCode add-on. It contains experimental features and fixes that are being validated before inclusion in the stable release.
 
-Beta **3.2.0b2** is based on **stable 3.1.0**, with the same pinned OpenCode `2.0.13`
+Beta **3.2.0b3** is based on **stable 3.1.0**, with the same pinned OpenCode `2.0.13`
 runtime. HA 2026.10 integration includes native LLM API discovery, prompt/context
 forwarding and an experimental native Assist/AI data-task adapter. The roadmap
 is tracked in [#45](https://github.com/magnusoverli/opencode/issues/45).
@@ -18,13 +18,20 @@ by default. **Restart Home Assistant (Core) after installation or an update**;
 restarting only the app cannot load the new code. A Core restart interrupts HA
 and Assist temporarily; it is never triggered automatically.
 
+**3.2.0b3:** setup includes a brief description beneath each
+entity choice and explains that both types can be added, one at a time. After a
+companion install/update, an HA notification provides the version and Core-restart
+instructions. The app retries delivery if HA is unavailable and avoids repeating
+delivered notices on app restarts. HA clears the notification on Core restart;
+dismiss a delayed reminder if you already restarted after its installation time.
+
 Open the app's authenticated Ingress UI and tap **Set up OpenCode Assist** in
 the top bar in either terminal or OpenChamber mode. The link stays within the
 current session, including in the iOS app where the URL is not visible. The
 administrator-only page displays installation/restart guidance and links to HA
 setup. After restarting Core, open **Settings → Devices & services** and configure
-the discovered **OpenCode Assist** app. Confirm the connection and choose whether
-to create a conversation agent or AI data task; HA then opens model/API selection
+the discovered **OpenCode Assist** app. Choose whether to create a conversation
+agent or AI data task and confirm the connection; HA then opens model/API selection
 automatically. **No URL or key needs copying.** Starting from **Add integration →
 OpenCode Assist** uses the same Supervisor discovery flow.
 
