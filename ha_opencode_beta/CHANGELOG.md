@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## 3.2.0b7
+
+- Fix LM Studio HTTP 400 errors for parameterless Home Assistant MCP tools by explicitly declaring empty input properties ([#149](https://github.com/magnusoverli/opencode/issues/149)); thanks @AceMoneus for the detailed reproduction.
+
 ## 3.2.0b6
 
 - Upgrade the pinned OpenCode CLI/plugin to 2.0.22 and OpenChamber to 2.1.0, preserving app-managed updates, Ingress, HA editor support and existing conversations/sign-ins.

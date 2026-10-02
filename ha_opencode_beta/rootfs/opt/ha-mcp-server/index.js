@@ -2321,6 +2321,7 @@ function formatNoteForDisplay(note) {
 
 const EMPTY_INPUT_SCHEMA = Object.freeze({
   type: "object",
+  properties: {},
   additionalProperties: false,
 });
 
