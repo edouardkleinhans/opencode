@@ -27,6 +27,10 @@ SOURCE = Path(__file__).resolve().parent / "custom_components" / DOMAIN
 class InstallError(Exception):
     """Installation stopped without overwriting conflicting files."""
 
+    def __init__(self, message, reason="installation_failed"):
+        super().__init__(message)
+        self.reason = reason
+
 
 def directory(path):
     # Reject links at every path component, not just the destination leaf.
@@ -79,15 +83,15 @@ def managed(root):
             raise ValueError()
         current = hashes(files_in(root, installed=True))
         if not current or marker.get("files") != current:
-            raise InstallError("App-managed companion has local edits or extra files; preserving it")
+            raise InstallError("App-managed companion has local edits or extra files; preserving it", "modified")
         for path, dirs, _ in os.walk(root):
             for name in dirs:
                 relative = (Path(path) / name).relative_to(root)
                 if "__pycache__" not in relative.parts and not any(key.startswith(relative.as_posix() + "/") for key in current):
-                    raise InstallError("App-managed companion has extra directories; preserving it")
+                    raise InstallError("App-managed companion has extra directories; preserving it", "modified")
         return marker
     except (FileNotFoundError, ValueError, TypeError, AttributeError) as error:
-        raise InstallError("Existing companion is user-managed or has no valid ownership record; preserving it") from error
+        raise InstallError("Existing companion is user-managed or has no valid ownership record; preserving it", "unmanaged") from error
 
 
 def sync_directory(path):
@@ -219,6 +223,12 @@ def main():
               "If you already restarted HA after this installation, continue with Set up OpenCode Assist. "
               "HA is never restarted automatically.", flush=True)
     except (InstallError, OSError, ValueError, KeyError) as error:
+        # The Ingress fallback can explain a blocked install without exposing raw
+        # exception text or requiring the pairing worker to be running.
+        try:
+            status_file(args.status_file, {"action": "blocked", "reason": getattr(error, "reason", "installation_failed")})
+        except OSError:
+            print("OpenCode Assist: could not write installation status; check the app log", file=sys.stderr)
         print(f"OpenCode Assist installation stopped: {error}. Assist will not start. "
               "Check custom_components/opencode_assist; back up and move a manual/edited copy out of "
               "custom_components before retrying app management. Restart this app after resolving the problem.", file=sys.stderr)

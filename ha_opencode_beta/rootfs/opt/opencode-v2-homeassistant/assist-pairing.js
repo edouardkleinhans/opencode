@@ -42,8 +42,9 @@ export function openAssistPairing(directory) {
       const token = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(header || "")?.[1];
       return healthy && data && token && equal(digest(token), data.hash) ? data.id : null;
     },
-    provision() {
-      const token = opaque();
+    provision(token) {
+      if (typeof token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(token)) throw new Error("Invalid Assist pairing key");
+      if (healthy && data && equal(digest(token), data.hash)) return token;
       save({ version: 1, id: opaque(), hash: digest(token) });
       return token;
     },

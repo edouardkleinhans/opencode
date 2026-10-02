@@ -1,6 +1,7 @@
 """Exercise real filesystem publication and failure paths without HA config."""
 
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -8,6 +9,7 @@ import shutil
 import tempfile
 import unittest
 from unittest.mock import patch
+from contextlib import redirect_stderr, redirect_stdout
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -97,6 +99,35 @@ class InstallTests(unittest.TestCase):
         with self.assertRaisesRegex(installer.InstallError, "user-managed"):
             self.install()
         self.assertEqual(self.snapshot(), before)
+
+    def test_cli_records_conflict_and_recovers_after_manual_copy_is_moved(self):
+        self.target.parent.mkdir()
+        shutil.copytree(self.source, self.target)
+        before = self.snapshot()
+        status = self.root / "status.json"
+        installer.status_file(status, {"action": "installed", "version": "old"})
+        args = ["install.py", "--config", str(self.config), "--status-file", str(status)]
+        with patch("sys.argv", args), redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            self.assertEqual(installer.main(), 1)
+            self.assertEqual(json.loads(status.read_text()), {"action": "blocked", "reason": "unmanaged"})
+            self.assertEqual(self.snapshot(), before)
+            backup = self.config / "opencode-assist-backup"
+            self.target.rename(backup)
+            self.assertEqual(installer.main(), 0)
+            self.assertEqual(json.loads(status.read_text())["action"], "installed")
+            self.assertEqual(installer.files_in(backup), before)
+            (self.target / "client.py").write_text("# local edit")
+            self.assertEqual(installer.main(), 1)
+            self.assertEqual(json.loads(status.read_text()), {"action": "blocked", "reason": "modified"})
+            self.assertEqual((self.target / "client.py").read_text(), "# local edit")
+
+    def test_cli_failure_status_omits_exception_details(self):
+        status = self.root / "status.json"
+        args = ["install.py", "--config", str(self.config), "--status-file", str(status)]
+        with patch("sys.argv", args), patch.object(installer, "install", side_effect=OSError("private details")), \
+                redirect_stderr(io.StringIO()):
+            self.assertEqual(installer.main(), 1)
+        self.assertEqual(json.loads(status.read_text()), {"action": "blocked", "reason": "installation_failed"})
 
     def test_local_edits_and_extra_files_are_preserved(self):
         for name in ["client.py", "personal.py", "empty-directory"]:

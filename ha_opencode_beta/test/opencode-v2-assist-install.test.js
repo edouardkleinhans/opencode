@@ -12,11 +12,14 @@ test("companion installer publishes whole trees and preserves conflicts/failures
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
 
-test("disabled Assist does not install; install failure prevents service start", () => {
+test("disabled Assist or failed installation withdraws discovery without starting the adapter", () => {
   const directory = mkdtempSync(join(tmpdir(), "assist-service-gate-"));
   try {
     const calls = join(directory, "calls");
     for (const name of ["python3", "sleep"]) writeFileSync(join(directory, name), `#!/bin/bash\necho ${name} >> "$CALLS"\n${name === "python3" ? "exit 1" : "exit 0"}\n`, { mode: 0o755 });
+    // The real withdrawal child has a scrubbed environment, so its fixture log
+    // path is embedded instead of relying on inherited test-only variables.
+    writeFileSync(join(directory, "node"), `#!/bin/bash\necho "node $*" >> ${JSON.stringify(calls)}\n`, { mode: 0o755 });
     const script = join(root, "rootfs/etc/s6-overlay/s6-rc.d/ha-assist/run");
     for (const enabled of ["false", "true"]) {
       writeFileSync(calls, "");
@@ -24,7 +27,8 @@ test("disabled Assist does not install; install failure prevents service start",
         env: { ...process.env, PATH: `${directory}:${process.env.PATH}`, CALLS: calls, ENABLED: enabled, RUN_SCRIPT: script }, encoding: "utf8", timeout: 5000,
       });
       assert.equal(result.status, 0, result.stderr);
-      assert.equal(readFileSync(calls, "utf8"), enabled === "true" ? "python3\nsleep\n" : "sleep\n");
+      const withdrawn = "node /opt/opencode-v2-homeassistant/assist-main.js --withdraw\nsleep\n";
+      assert.equal(readFileSync(calls, "utf8"), enabled === "true" ? "python3\n" + withdrawn : withdrawn);
     }
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });

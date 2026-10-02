@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## 3.2.0b2
+
+- Replace manual Assist URL/key pairing with Supervisor discovery, automatic scoped credentials, and HA confirmation followed by model/API selection; recreate old experimental entries through discovery.
+- Use the managed OpenCode workspace for Assist model discovery and requests, fixing an empty model list during integration setup.
+- Fix Assist shutdown/startup-failure lock cleanup and show installation-conflict recovery steps.
+- To enable: turn on `ha_assist_enabled`, restart the app, then restart **Home Assistant Core**. Configure the discovered **OpenCode Assist** app in Settings → Devices & services, confirm, and choose a model and APIs. No APIs are selected by default.
+- Upgrade cleanup: remove old manually paired OpenCode Assist integration entries and recreate them through discovery. Manually installed or edited companion files remain protected; resolve any installation conflict as described in the app log before restarting Core.
+- Bundle companion **0.1.0b3** with expiring bootstrap credentials, HA-confirmed key renewal, and pairing preservation across ordinary restarts and disabling. Requires HA 2026.10 with Supervisor; live supervised HA/voice-pipeline and physical iOS acceptance remain pending ([#45](https://github.com/magnusoverli/opencode/issues/45)).
+
 ## 3.2.0b1
 
 - Bundle and atomically install the optional Assist companion when enabled, preserve manual/edited copies, and add mobile-friendly setup links and Home Assistant restart guidance in both Ingress modes.

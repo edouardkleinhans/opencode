@@ -58,6 +58,23 @@ class AssistClient:
         except (aiohttp.ClientError, TimeoutError, ValueError) as err:
             raise HomeAssistantError("Cannot connect to OpenCode Assist") from err
 
+    async def onboard(self, pairing_key: str | None = None) -> dict:
+        """Use a short-lived Supervisor bootstrap, never a user's HA token."""
+        try:
+            kwargs = {"json": {"key": pairing_key}} if pairing_key is not None else {}
+            async with self._request("POST" if pairing_key is not None else "GET", "/v1/onboarding",
+                                     timeout=aiohttp.ClientTimeout(total=10), **kwargs) as response:
+                self._check(response)
+                data = await response.json()
+                if pairing_key is None:
+                    if data.get("version") != 1 or not isinstance(data.get("models"), list):
+                        raise HomeAssistantError("Unsupported OpenCode Assist protocol")
+                elif data.get("paired") is not True:
+                    raise HomeAssistantError("OpenCode Assist pairing failed")
+                return data
+        except (aiohttp.ClientError, TimeoutError, ValueError) as err:
+            raise HomeAssistantError("Cannot complete OpenCode Assist onboarding") from err
+
     async def revoke(self) -> None:
         """Invalidate only this pairing when the HA entry is removed."""
         try:

@@ -4,6 +4,98 @@ Updated: 2026-10-02. This is the single shared plan for this work, tracked in Gi
 Only open tasks appear as checkboxes; close them with concrete evidence and keep
 the remaining list current instead of accumulating historical plans.
 
+## Assist fixes and Supervisor-native onboarding — beta 3.2.0b2
+
+- User authorized committing/pushing the completed changes and releasing
+  **3.2.0b2**. Release preparation is in progress: publish and qualify amd64/arm64
+  images before pushing `beta-v3.2.0b2`; the release workflow then advances the
+  storefront from b1 to b2. OpenCode remains pinned to **2.0.13**.
+
+- User-reported shutdown failure: the shared state-lock helper returns an unlock
+  function, not an object with `.close()`. The worker now releases it on shutdown
+  and startup failure, locks before opening pairing state, and handles repeated
+  signals with one bounded shutdown. Pairing survives restart.
+- Installer conflicts now publish a bounded reason code for the trusted Ingress
+  fallback page. It explains backup/move/restart recovery while preserving manual
+  and edited copies. The setup page now leads to Supervisor onboarding rather
+  than asking users to open or copy an internal URL.
+- User-reported empty model list: the facade selected `/homeassistant` while its
+  RPC client used the server's managed workspace. Use the server's default
+  location for both model discovery and disposable sessions. Regression tests
+  exercise production defaults instead of injecting the fixture directory.
+- Earlier fixes verification: **275 beta tests passed / 3 environment skips**, including mobile
+  Chromium in both Ingress modes. Native amd64 boundary build passed all existing
+  checks, **10 installer tests** and **9 Assist tests** on Node 24.15.0/OpenCode
+  2.0.13. Local image `opencode-beta:assist-recovery-local`, config digest
+  `sha256:9b46758048d67bba7b91f0e2b89fce24204259c1b6ed2204c5c8b8acc978c50b`.
+  All **6 actual HA 2026.10.0b0 contracts** also passed using the facade's
+  production-default workspace selection, including tool execution and follow-up.
+- Published beta remains 3.2.0b1 until b2 artifacts are ready. Supervised HA/iOS
+  acceptance and remote ARM qualification are pending at release preparation.
+
+### Supervisor-only onboarding
+
+- Declared `opencode_assist` alongside existing `mcp` in the app's `discovery`
+  list. The root worker publishes `POST http://supervisor/discovery` with
+  `service: "opencode_assist"` and bounded connection metadata once ready.
+  Supervisor validates the service against that declaration; it is not limited
+  to a fixed built-in domain list and requires no new elevated API role.
+- Companion **0.1.0b3** implements `async_step_hassio(HassioServiceInfo)` for a
+  native discovered-integration card with the app name/slug and internal URL.
+  HA Core fetches discovery data from Supervisor rather than trusting the push
+  request's configuration. The companion refreshes authenticated Supervisor
+  metadata at confirmation and validates the URL against the app's actual hostname.
+  Discovery is replayed at Core startup; ordinary rediscovery never rotates a key.
+- Replaced URL/key copy-paste with a short-lived, single-use bootstrap exchange
+  over the internal connection after the administrator confirms the HA flow.
+  HA generates the scoped durable key; app storage remains digest-only. Discovery
+  contains only a ten-minute bootstrap, refreshed before expiry and after use.
+  Retrying a lost response with the same key is idempotent; consumed/expired
+  bootstraps cannot rotate or resurrect revoked access. Credentials never appear
+  in browser pages or deep links. Reauthentication/reconfiguration requires HA
+  confirmation, renews the key, and preserves configured entities.
+- Chained initial configuration directly into conversation/model/API selection
+  using `async_on_create_entry` and `next_flow` with
+  `FlowType.CONFIG_SUBENTRIES_FLOW`, supported by Core 2026.10.0b0. Keep API
+  selections explicit with none selected by default. If the backend disappears
+  before the next step, retain the entry without returning a broken next-flow ID.
+- Per user direction, removed the manual pairing UI/forms/endpoints and migration
+  logic. Existing experimental manual entries must be removed and recreated from
+  discovery. Manually installed or edited companion files are still preserved by
+  the installer; file ownership is separate from pairing migration.
+- Kept the Core restart for newly installed/updated custom code and the HA
+  discovery confirmation. Discovery does not hot-reload Python integrations.
+  Supervisor has restart operations, but restarting Core stays an explicit user
+  action. Disable/installation failure withdraws only the saved advertisement,
+  retrying Supervisor outages and preserving app pairing, installed code and HA
+  configuration. Stable `supervisor:<app-slug>` IDs avoid Core's UUID-matched
+  discovery deletion behavior; the actual HA deletion handler is tested.
+- Verification: **282 beta tests passed / 3 environment skips**, including both
+  mobile Chromium Ingress views, **10 installer filesystem tests**, and **14
+  actual HA 2026.10.0b0 contracts**. Tests use Core's config-entry/subentry managers
+  for discovery, confirmation, model/API handoff, retry, rediscovery, renewal and
+  disable behavior, plus real Python-client → worker → pinned OpenCode transport.
+  **19 shared MCP discovery tests** and both channels' option checks also pass.
+- Native amd64 boundary image `opencode-beta:assist-supervisor-local` passed the
+  existing runtime boundaries, **10 installer tests** and **16 Assist tests** with
+  Node 24.15.0/OpenCode 2.0.13. Image config digest:
+  `sha256:387623c3f6a047ba7fd44c1ba86878c870b7e40a4157c7d003d8a20db3f16dab`.
+  All **13 companion files** in this image match the generated ZIP byte-for-byte.
+- Companion ZIP generated at `/tmp/opencode/assist-supervisor/opencode-assist.zip`
+  (version 0.1.0b3, SHA256
+  `c864de099deff46046a66e8c6cb206798fa06dccabcc589b102967adbfd190c7`).
+- Full supervised HA/voice-pipeline and physical iOS acceptance remain pending.
+  Native ARM and remote CI qualification will be recorded with b2 release evidence.
+- Sources checked 2026-10-02: [app communication](https://developers.home-assistant.io/docs/apps/communication/),
+  [Supervisor discovery API](https://developers.home-assistant.io/docs/api/supervisor/endpoints/#discovery),
+  [config flows and chaining](https://developers.home-assistant.io/docs/config_entries_config_flow_handler/),
+  Core [hassio discovery](https://github.com/home-assistant/core/blob/2026.10.0b0/homeassistant/components/hassio/discovery.py),
+  [Wyoming discovery flow](https://github.com/home-assistant/core/blob/2026.10.0b0/homeassistant/components/wyoming/config_flow.py),
+  [config-entry chaining](https://github.com/home-assistant/core/blob/2026.10.0b0/homeassistant/config_entries.py),
+  [loader cache](https://github.com/home-assistant/core/blob/2026.10.0b0/homeassistant/loader.py),
+  Supervisor [discovery API](https://github.com/home-assistant/supervisor/blob/main/supervisor/api/discovery.py)
+  and [persistence/deduplication](https://github.com/home-assistant/supervisor/blob/main/supervisor/discovery/__init__.py).
+
 ## Assist setup improvements — beta 3.2.0b1 release
 
 - Published [beta 3.2.0b1](https://github.com/magnusoverli/opencode/releases/tag/beta-v3.2.0b1)

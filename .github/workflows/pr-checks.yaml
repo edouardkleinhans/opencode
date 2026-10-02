@@ -102,6 +102,9 @@ jobs:
       - name: Install pinned OpenCode runtime
         working-directory: ha_opencode_beta/rootfs/opt/opencode-v2-homeassistant
         run: npm ci --no-audit --no-fund
+      - name: Install shared Assist authentication dependencies
+        working-directory: ha_opencode_beta/rootfs/opt/ha-mcp-server
+        run: npm install --ignore-scripts --no-audit --no-fund
       - name: Exercise actual HA ChatLog and companion contracts
         run: node scripts/test-ha-assist-core.mjs
       - name: Verify companion packaging

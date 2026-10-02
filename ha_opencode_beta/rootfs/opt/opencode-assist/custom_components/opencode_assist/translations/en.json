@@ -2,12 +2,11 @@
   "title": "OpenCode Assist",
   "config": {
     "step": {
-      "user": {"title": "Pair with the OpenCode beta app", "description": "Enable ha_assist_enabled in the app and open its administrator-only /ha-assist/ Ingress page. Enter the internal URL and pairing key shown there. Requires Home Assistant 2026.10.", "data": {"url": "App URL", "api_key": "Pairing key"}},
-      "reauth_confirm": {"title": "Renew pairing", "description": "Create a new pairing key on the app's /ha-assist/ Ingress page.", "data": {"api_key": "New pairing key"}},
-      "reconfigure": {"title": "Update app connection", "data": {"url": "App URL", "api_key": "Pairing key"}}
+      "supervisor": {"title": "Find the OpenCode app", "description": "Enable Assist in the OpenCode Beta app and restart the app. Restart Home Assistant Core after installing or updating the companion. Select the discovered app; connection details and credentials are exchanged automatically.", "data": {"addon_slug": "OpenCode app"}},
+      "hassio_confirm": {"title": "Connect OpenCode Assist", "description": "Confirm to pair with this app automatically. No URL or key needs copying. Provider charges may apply. Next, choose a model and the Home Assistant APIs to allow; no APIs are selected automatically. For an existing connection, confirming renews its pairing key.", "data": {"entity_type": "Create first"}}
     },
-    "error": {"cannot_connect": "Cannot connect to the app.", "invalid_auth": "Pairing key rejected or revoked.", "no_models": "Configure an available provider and model in OpenCode first."},
-    "abort": {"already_configured": "This app is already configured."}
+    "error": {"cannot_connect": "Cannot connect to the app. Check that Assist is enabled and the app is running, then retry.", "invalid_auth": "Pairing key rejected or revoked.", "no_models": "No text-capable models are available in the app's managed OpenCode workspace. Connect a provider and enable a model in OpenCode, then retry.", "supervisor_unavailable": "Supervisor discovery is temporarily unavailable. Retry when Supervisor is ready.", "no_apps": "No ready OpenCode Assist app was found. Enable Assist, check its installation log, and retry after the app starts.", "discovery_expired": "The automatic pairing request expired. Submit again to fetch fresh discovery information."},
+    "abort": {"already_configured": "This app is already configured.", "supervisor_unavailable": "Supervisor discovery is temporarily unavailable.", "no_apps": "The OpenCode app is not ready for automatic onboarding. Check its Assist option and installation log.", "legacy_pairing": "Remove this old manually paired integration entry, then configure the discovered OpenCode app."}
   },
   "config_subentries": {
     "conversation": {

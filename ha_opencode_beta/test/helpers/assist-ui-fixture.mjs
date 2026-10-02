@@ -17,8 +17,8 @@ export async function startAssistUiFixture(mode) {
   const admin = "a".repeat(32);
   let user = admin;
   const worker = await startAssistHttp({ client: { rpc: () => ({}) }, pairing: openAssistPairing(directory),
-    ingressSecret: "fixture-secret", verifyAdmin: async (id) => id === admin, hostname: "fixture-addon",
-    coreHost: "127.0.0.1", corePort: 0, ipcPort: 0, installation: { version: "0.1.0b2", installed_at: "2026-10-02T10:00:00Z" } });
+    ingressSecret: "fixture-secret", verifyAdmin: async (id) => id === admin, discovery: { published: true },
+    coreHost: "127.0.0.1", corePort: 0, ipcPort: 0, installation: { version: "0.1.0b3", installed_at: "2026-10-02T10:00:00Z" } });
   // Match the pinned ttyd/container and OpenChamber fullscreen layout contracts.
   const upstream = createServer((req, res) => {
     res.writeHead(200, { "content-type": "text/html" });
@@ -44,7 +44,7 @@ export async function startAssistUiFixture(mode) {
     }
     const pairing = req.url === `${base}/ha-assist/`;
     // Simulate Core's authenticated Ingress metadata and the separately tested
-    // trusted IPC hop. The real worker still enforces admin, Origin and CSRF.
+    // trusted IPC hop. The real worker still enforces admin and trusted metadata.
     const headers = pairing ? { ...req.headers, "x-ha-mcp-ingress-secret": "fixture-secret", "x-ha-mcp-user-id": user,
       "x-ha-mcp-external-origin": origin, "x-ha-mcp-external-path": base + "/ha-assist/" } : {
       ...req.headers, "x-ingress-path": base, "x-remote-user-id": user,

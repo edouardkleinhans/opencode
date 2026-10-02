@@ -6,7 +6,7 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_API_KEY, CONF_URL
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady, HomeAssistantError
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryError, ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .client import AssistAuthError, AssistClient
@@ -23,6 +23,8 @@ type OpenCodeConfigEntry = ConfigEntry[RuntimeData]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: OpenCodeConfigEntry) -> bool:
+    if not entry.data.get("addon_slug"):
+        raise ConfigEntryError("Remove the old manually paired OpenCode Assist entry and configure the discovered app through Supervisor")
     client = AssistClient(async_get_clientsession(hass), entry.data[CONF_URL], entry.data[CONF_API_KEY])
     try:
         info = await client.info()
@@ -50,4 +52,4 @@ async def async_remove_entry(hass: HomeAssistant, entry: OpenCodeConfigEntry) ->
     try:
         await client.revoke()
     except HomeAssistantError:
-        logging.getLogger(__name__).warning("Could not revoke the app-side pairing; revoke it on the app's Assist pairing page")
+        logging.getLogger(__name__).warning("Could not revoke pairing while the app is unavailable; configuring it again through Supervisor replaces the old key")

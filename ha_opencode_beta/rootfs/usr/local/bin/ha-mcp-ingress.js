@@ -2,6 +2,17 @@ const fs = require("node:fs");
 const http = require("node:http");
 const { assistUnavailable } = require("./assist-setup-ui.js");
 
+function assistInstallationStatus() {
+  let fd;
+  try {
+    fd = fs.openSync("/run/ha-assist-install.json", fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
+    const stat = fs.fstatSync(fd);
+    if (!stat.isFile() || stat.uid !== 0 || (stat.mode & 0o777) !== 0o600 || stat.nlink !== 1 || stat.size > 1024) return;
+    return JSON.parse(fs.readFileSync(fd, "utf8"));
+  } catch { return; }
+  finally { if (fd !== undefined) fs.closeSync(fd); }
+}
+
 // This boundary is independent of the UI's loopback/LAN allowlist.
 function routeHaMcp(req, res, { ingressPath, upstreamPath, lan = false }) {
   const pathname = upstreamPath.split("?", 1)[0];
@@ -12,8 +23,8 @@ function routeHaMcp(req, res, { ingressPath, upstreamPath, lan = false }) {
   const reject = (status) => {
     if (assist && status === 503) {
       res.writeHead(503, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store",
-        "content-security-policy": "default-src 'none'; frame-ancestors 'self'; base-uri 'none'", "x-content-type-options": "nosniff" });
-      res.end(assistUnavailable(ingressPath));
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'; base-uri 'none'", "x-content-type-options": "nosniff" });
+      res.end(assistUnavailable(ingressPath, assistInstallationStatus()));
       return;
     }
     res.writeHead(status, { "content-type": "text/plain", "cache-control": "no-store" });

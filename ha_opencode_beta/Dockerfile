@@ -356,6 +356,8 @@ RUN --mount=type=bind,source=test,target=/tmp/ha-assist/test,readonly \
     && PYTHONDONTWRITEBYTECODE=1 python3 /tmp/ha-assist/test/assist-install.test.py \
     && timeout --signal=TERM --kill-after=10s 120s node --test \
         /tmp/ha-assist/test/opencode-v2-assist-adapter.test.js \
+        /tmp/ha-assist/test/opencode-v2-assist-discovery.test.js \
+        /tmp/ha-assist/test/opencode-v2-assist-lifecycle.test.js \
         /tmp/ha-assist/test/opencode-v2-assist-service.test.js
 
 FROM runtime AS final

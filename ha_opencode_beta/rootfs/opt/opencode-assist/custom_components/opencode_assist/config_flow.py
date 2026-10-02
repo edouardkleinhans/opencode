@@ -1,64 +1,140 @@
 """UI setup, revocable pairing, reauthentication and per-entity options."""
 
+import secrets
+
 import probatio
 
-from homeassistant.config_entries import ConfigFlow, ConfigSubentryFlow, ConfigEntryState
+from homeassistant.config_entries import ConfigFlow, ConfigSubentryFlow, ConfigEntryState, FlowType, SOURCE_USER
 from homeassistant.const import CONF_API_KEY, CONF_LLM_HASS_API, CONF_MODEL, CONF_PROMPT, CONF_URL
 from homeassistant.core import callback
+from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import llm
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig, TextSelector, TextSelectorConfig, TextSelectorType, TemplateSelector
+from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig, TemplateSelector
 
 from .client import AssistAuthError, AssistClient
 from .const import DOMAIN
+from .supervisor import async_discover_apps
 
-
-def connection_schema(reauth=False):
-    fields = {} if reauth else {probatio.Required(CONF_URL): TextSelector(TextSelectorConfig(type=TextSelectorType.URL))}
-    fields[probatio.Required(CONF_API_KEY)] = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
-    return probatio.Schema(fields)
+CONF_ADDON_SLUG = "addon_slug"
 
 
 class OpenCodeFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
-    async def _connection(self, step, user_input=None):
-        entry = self._get_reauth_entry() if step == "reauth_confirm" else self._get_reconfigure_entry() if step == "reconfigure" else None
-        errors = {}
-        if user_input is not None:
-            url = (entry.data[CONF_URL] if step == "reauth_confirm" else user_input[CONF_URL]).strip().rstrip("/")
-            key = user_input[CONF_API_KEY].strip()
-            try:
-                client = AssistClient(async_get_clientsession(self.hass), url, key)
-                info = await client.info()
-                if not info["models"]:
-                    errors["base"] = "no_models"
-            except AssistAuthError:
-                errors["base"] = "invalid_auth"
-            except (HomeAssistantError, ValueError):
-                errors["base"] = "cannot_connect"
-            if not errors:
-                if any(existing.entry_id != (entry.entry_id if entry else None) and existing.data[CONF_URL] == url
-                       for existing in self._async_current_entries()):
-                    return self.async_abort(reason="already_configured")
-                data = {CONF_URL: url, CONF_API_KEY: key}
-                if entry:
-                    return self.async_update_and_abort(entry, data=data)
-                return self.async_create_entry(title="OpenCode Assist", data=data)
-        return self.async_show_form(step_id=step, data_schema=connection_schema(step == "reauth_confirm"), errors=errors)
+    def __init__(self):
+        self._selected_slug = None
+        self._auto_entry = None
+        self._auto_key = None
+        self._initial_subentry = "conversation"
 
     async def async_step_user(self, user_input=None):
-        return await self._connection("user", user_input)
+        return await self.async_step_supervisor(user_input)
+
+    async def async_step_supervisor(self, user_input=None):
+        errors = {}
+        try:
+            apps = await async_discover_apps(self.hass)
+        except HomeAssistantError:
+            apps = []
+            errors["base"] = "supervisor_unavailable"
+        if not apps:
+            errors.setdefault("base", "no_apps")
+        if len(apps) == 1 and not user_input:
+            return await self._select_app(apps[0])
+        if user_input:
+            app = next((item for item in apps if item.slug == user_input.get(CONF_ADDON_SLUG)), None)
+            if app:
+                return await self._select_app(app)
+            errors["base"] = "no_apps"
+        schema = probatio.Schema({probatio.Required(CONF_ADDON_SLUG): SelectSelector(SelectSelectorConfig(
+            options=[{"value": app.slug, "label": app.name} for app in apps]))}) if apps else probatio.Schema({})
+        return self.async_show_form(step_id="supervisor", data_schema=schema, errors=errors)
+
+    async def async_step_hassio(self, discovery_info):
+        # Re-read through Core's authenticated Supervisor client, not from a
+        # caller-supplied config URL or a bootstrap stored in the flow context.
+        try:
+            apps = await async_discover_apps(self.hass)
+        except HomeAssistantError:
+            return self.async_abort(reason="supervisor_unavailable")
+        app = next((item for item in apps if item.slug == discovery_info.slug), None)
+        if not app:
+            return self.async_abort(reason="no_apps")
+        return await self._select_app(app)
+
+    async def _select_app(self, app):
+        unique_id = f"supervisor:{app.slug}"
+        await self.async_set_unique_id(unique_id)
+        if self._auto_entry is None:
+            self._abort_if_unique_id_configured(updates={CONF_URL: app.url, CONF_ADDON_SLUG: app.slug})
+        self._selected_slug = app.slug
+        self.context["title_placeholders"] = {"name": app.name}
+        self.context["configuration_url"] = f"homeassistant://hassio/addon/{app.slug}/info"
+        return await self.async_step_hassio_confirm()
+
+    async def async_step_hassio_confirm(self, user_input=None):
+        errors = {}
+        if user_input is not None:
+            try:
+                # Refresh expiring discovery data when the user submits, even if
+                # the card was open across a Core/app restart or bootstrap expiry.
+                apps = await async_discover_apps(self.hass)
+                app = next((item for item in apps if item.slug == self._selected_slug), None)
+                if app is None:
+                    errors["base"] = "no_apps"
+                else:
+                    client = AssistClient(async_get_clientsession(self.hass), app.url, app.bootstrap)
+                    info = await client.onboard()
+                    if not info["models"]:
+                        errors["base"] = "no_models"
+                    else:
+                        # Generate once per flow: retrying a lost response sends
+                        # the same key. The app only stores its digest.
+                        self._auto_key = self._auto_key or secrets.token_urlsafe(32)
+                        await client.onboard(self._auto_key)
+                        data = {CONF_URL: app.url, CONF_API_KEY: self._auto_key, CONF_ADDON_SLUG: app.slug}
+                        if self._auto_entry is not None:
+                            return self.async_update_and_abort(self._auto_entry, data={**self._auto_entry.data, **data})
+                        self._initial_subentry = user_input.get("entity_type", "conversation")
+                        return self.async_create_entry(title=app.name, data=data)
+            except AssistAuthError:
+                errors["base"] = "discovery_expired"
+            except (HomeAssistantError, ValueError):
+                errors["base"] = "cannot_connect"
+        schema = probatio.Schema({}) if self._auto_entry else probatio.Schema({
+            probatio.Required("entity_type", default="conversation"): SelectSelector(SelectSelectorConfig(options=[
+                {"value": "conversation", "label": "Conversation agent"},
+                {"value": "ai_task_data", "label": "AI data task"},
+            ])),
+        })
+        return self.async_show_form(step_id="hassio_confirm", data_schema=schema, errors=errors)
+
+    async def async_on_create_entry(self, result):
+        entry = result["result"]
+        if entry.state is ConfigEntryState.LOADED and self._initial_subentry in ("conversation", "ai_task_data"):
+            subflow = await self.hass.config_entries.subentries.async_init(
+                (entry.entry_id, self._initial_subentry), context={"source": SOURCE_USER})
+            if subflow["type"] is FlowResultType.FORM:
+                result["next_flow"] = (FlowType.CONFIG_SUBENTRIES_FLOW, subflow["flow_id"])
+        return result
 
     async def async_step_reauth(self, entry_data):
-        return await self.async_step_reauth_confirm()
-
-    async def async_step_reauth_confirm(self, user_input=None):
-        return await self._connection("reauth_confirm", user_input)
+        entry = self._get_reauth_entry()
+        if entry.data.get(CONF_ADDON_SLUG):
+            self._auto_entry = entry
+            self._selected_slug = entry.data[CONF_ADDON_SLUG]
+            return await self.async_step_hassio_confirm()
+        return self.async_abort(reason="legacy_pairing")
 
     async def async_step_reconfigure(self, user_input=None):
-        return await self._connection("reconfigure", user_input)
+        entry = self._get_reconfigure_entry()
+        if entry.data.get(CONF_ADDON_SLUG):
+            self._auto_entry = entry
+            self._selected_slug = entry.data[CONF_ADDON_SLUG]
+            return await self.async_step_hassio_confirm(user_input)
+        return self.async_abort(reason="legacy_pairing")
 
     @classmethod
     @callback

@@ -2,7 +2,7 @@
 
 This is the **beta channel** for the OpenCode add-on. It contains experimental features and fixes that are being validated before inclusion in the stable release.
 
-Beta **3.2.0b1** is based on **stable 3.1.0**, with the same pinned OpenCode `2.0.13`
+Beta **3.2.0b2** is based on **stable 3.1.0**, with the same pinned OpenCode `2.0.13`
 runtime. HA 2026.10 integration includes native LLM API discovery, prompt/context
 forwarding and an experimental native Assist/AI data-task adapter. The roadmap
 is tracked in [#45](https://github.com/magnusoverli/opencode/issues/45).
@@ -11,7 +11,8 @@ is tracked in [#45](https://github.com/magnusoverli/opencode/issues/45).
 
 The beta can act as a model backend for HA through the optional
 [OpenCode Assist companion](rootfs/opt/opencode-assist/custom_components/opencode_assist/README.md).
-Beta **3.2.0b1** bundles the matching integration: enable `ha_assist_enabled` and
+**3.2.0b2:** the Supervisor-only setup below replaces the experimental manual
+pairing used in **3.2.0b1**. Enable `ha_assist_enabled` and
 restart the app to install it into HA's `custom_components` directory. It is off
 by default. **Restart Home Assistant (Core) after installation or an update**;
 restarting only the app cannot load the new code. A Core restart interrupts HA
@@ -20,21 +21,45 @@ and Assist temporarily; it is never triggered automatically.
 Open the app's authenticated Ingress UI and tap **Set up OpenCode Assist** in
 the top bar in either terminal or OpenChamber mode. The link stays within the
 current session, including in the iOS app where the URL is not visible. The
-administrator-only page displays installation/restart guidance and creates a
-one-time-displayed pairing URL/key for HA's **Add integration → OpenCode Assist**
-flow. Enter those values, then create conversation or AI data-task subentries.
-Pairing is still manual. API choices come from
-HA's current registry and default to none; select Assist explicitly for home
-control. This selection is independent of the app's outgoing native-MCP option.
+administrator-only page displays installation/restart guidance and links to HA
+setup. After restarting Core, open **Settings → Devices & services** and configure
+the discovered **OpenCode Assist** app. Confirm the connection and choose whether
+to create a conversation agent or AI data task; HA then opens model/API selection
+automatically. **No URL or key needs copying.** Starting from **Add integration →
+OpenCode Assist** uses the same Supervisor discovery flow.
+
+API choices come from HA's current registry and default to none; select Assist
+explicitly for home control. Select the resulting conversation entity in your
+Assist pipeline, or the AI task entity for `ai_task.generate_data`. Additional
+agents/tasks can be added as subentries. This is independent of the app's outgoing
+native-MCP option.
 
 The installer atomically installs or updates only an unmodified app-managed
 copy. A manual installation (including the 3.2.0b0 ZIP) or edited files produce a
 clear conflict in the app log and prevent Assist from starting. Back up and move
 the conflicting directory out of `custom_components` before opting into app
-management, then restart the app and Core. Disabling the option keeps installed
-files and HA configuration. Code is bundled in the image, not downloaded at
-startup; the separate release ZIP contains the same companion sources. For
-**3.2.0b0**, install that ZIP manually and restart HA before pairing.
+management, then restart the app and Core. Disabling the option withdraws discovery
+and stops the adapter, keeping installed files, pairing and HA configuration.
+Code is bundled in the image, not downloaded at startup; the separate release ZIP
+contains the same companion sources.
+
+If setup reports an installation conflict, back up
+`/homeassistant/custom_components/opencode_assist` (often shown as
+`/config/custom_components/opencode_assist` in other HA tools), then move the
+whole folder outside `custom_components`, for example into a backup folder in
+the HA configuration directory. Remove any old manually paired OpenCode Assist
+entry in HA; those experimental entries are not migrated. Restart the app with
+`ha_assist_enabled` enabled, confirm successful installation in its log, then
+restart Core and configure the discovered app. Review any local code changes
+before reapplying them to an app-managed installation.
+
+Supervisor discovery exchanges an expiring, single-use bootstrap token; HA creates
+and stores its scoped pairing key, while the app persists only its digest. Ordinary
+restarts and rediscovery preserve the pairing. Renew it through HA's reauthentication
+or Reconfigure flow. Removing the integration revokes it when the app is reachable;
+if removed while offline, the next confirmed setup replaces the old key. If no app
+is discovered, check that Assist is enabled and its installation succeeded, restart
+Core after companion updates, and retry when Supervisor and OpenCode are ready.
 
 HA owns the ChatLog, caller context and selected tool execution. The adapter
 streams model text and returns structured calls to HA in isolated disposable

@@ -5,12 +5,12 @@ export class AssistError extends Error {
   constructor(status, code) { super(code); this.status = status; }
 }
 const requireValue = (value, status, code) => { if (!value) throw new AssistError(status, code); };
-export async function readAssistJson(req) {
+export async function readAssistJson(req, limit = 524288) {
   requireValue(req.headers["content-type"]?.split(";")[0] === "application/json", 415, "json_required");
   const chunks = []; let size = 0;
   for await (const chunk of req) {
     size += chunk.length;
-    requireValue(size <= 524288, 413, "request_too_large");
+    requireValue(size <= limit, 413, "request_too_large");
     chunks.push(chunk);
   }
   try { return JSON.parse(Buffer.concat(chunks)); } catch { throw new AssistError(400, "invalid_json"); }
@@ -22,16 +22,24 @@ export function assistJson(res, status, value) {
 
 // Fixed-purpose facade: never forward caller paths, headers, sessions, file
 // attachments, agents or permissions to the privileged OpenCode API.
-export function createAssistService({ client, authenticate, revokePairing, directory = "/homeassistant" }) {
+export function createAssistService({ client, authenticate, revokePairing, directory }) {
   const active = new Map();
   const starting = new Set();
   let closing = false;
   const rpc = client.rpc(AssistRpc);
+  // Use the server's managed workspace, just like the RPC plugin. /homeassistant
+  // is a different OpenCode location and may not have the managed provider/model
+  // configuration or private Assist agent. Tests may use an explicit location.
+  const location = directory === undefined ? undefined : { directory };
   async function models() {
-    const result = await client.model.list({ location: { directory } });
+    const result = await client.model.list({ location });
     return result.data.filter((model) => model.enabled !== false && model.capabilities?.input?.includes("text") && model.capabilities?.output?.includes("text"))
       .map((model) => ({ id: model.id, providerID: model.providerID, name: model.name,
         tools: model.capabilities.tools === true }));
+  }
+  async function info() {
+    return { version: 1, conversation: true, generate_data: true, streaming: true,
+      attachments: false, generate_image: false, models: await models() };
   }
   async function cleanup(request) {
     if (request.closing) return request.closing;
@@ -49,6 +57,7 @@ export function createAssistService({ client, authenticate, revokePairing, direc
       await Promise.all([...active.values()].filter((r) => r.owner === owner).map(cleanup));
   }
   return {
+    info,
     revoke,
     async close() {
       closing = true;
@@ -71,8 +80,7 @@ export function createAssistService({ client, authenticate, revokePairing, direc
           assistJson(res, 200, { revoked: true }); return;
         }
         if (req.method === "GET" && path === "/v1/info") {
-          assistJson(res, 200, { version: 1, conversation: true, generate_data: true, streaming: true,
-            attachments: false, generate_image: false, models: await models() }); return;
+          assistJson(res, 200, await info()); return;
         }
         const match = /^\/v1\/requests\/([a-f0-9-]{36})\/results$/.exec(path);
         if (req.method === "POST" && match) {
@@ -93,7 +101,7 @@ export function createAssistService({ client, authenticate, revokePairing, direc
         requireValue(Array.isArray(body.tools) && Array.isArray(body.messages) && typeof body.system === "string", 400, "invalid_request");
         const model = (await models()).find((candidate) => candidate.id === body.model?.id && candidate.providerID === body.model?.providerID);
         requireValue(model && (!body.tools.length || model.tools), 400, "unsupported_model");
-        const session = await client.session.create({ title: "Home Assistant request", location: { directory }, agent: "home-assistant-assist", model: { id: model.id, providerID: model.providerID },
+        const session = await client.session.create({ title: "Home Assistant request", location, agent: "home-assistant-assist", model: { id: model.id, providerID: model.providerID },
           permissions: [{ action: "*", resource: "*", effect: "deny" }] });
         request = { sessionID: session.id, owner, abort: reservation.abort };
         request.abort.signal.throwIfAborted();

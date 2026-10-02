@@ -19,7 +19,7 @@ test("setup links are session-scoped and excluded outside trusted Ingress", () =
 });
 
 for (const mode of ["terminal", "openchamber"]) {
-  test(`${mode}: proxy serves setup link and protects direct pairing access`, async () => {
+  test(`${mode}: proxy serves setup link and protects direct setup access`, async () => {
     const fixture = await startAssistUiFixture(mode);
     try {
       const response = await fetch(fixture.origin + fixture.base + "/");
@@ -34,7 +34,7 @@ for (const mode of ["terminal", "openchamber"]) {
     } finally { await fixture.close(); }
   });
 
-  test(`${mode}: mobile Ingress iframe navigates to pairing and back`, { skip: !browserPath && "set HA_ASSIST_BROWSER_EXECUTABLE for rendered mobile checks", timeout: 30000 }, async () => {
+  test(`${mode}: mobile Ingress iframe navigates to automatic setup and back`, { skip: !browserPath && "set HA_ASSIST_BROWSER_EXECUTABLE for rendered mobile checks", timeout: 30000 }, async () => {
     const fixture = await startAssistUiFixture(mode);
     const puppeteer = mcpRequire("puppeteer-core");
     let browser;
@@ -56,9 +56,10 @@ for (const mode of ["terminal", "openchamber"]) {
       assert.equal(frame.url(), fixture.origin + fixture.base + "/ha-assist/");
       assert.equal(page.url(), fixture.origin + "/ha-parent", "navigation stays within the HA Ingress iframe");
       assert.match(await frame.content(), /Restart Home Assistant after installing or updating/);
-      await Promise.all([frame.waitForNavigation(), frame.tap('button[value="provision"]')]);
-      assert.match(await frame.content(), /Pairing key: <code>[A-Za-z0-9_-]{43}<\/code>/);
-      assert.ok(await frame.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "the key is readable without horizontal scrolling");
+      assert.match(await frame.content(), /No URL or key needs copying/);
+      assert.equal(await frame.$("form"), null);
+      assert.equal(await frame.$eval('a[target="_top"]', (link) => link.href), "https://my.home-assistant.io/redirect/config_flow_start/?domain=opencode_assist");
+      assert.ok(await frame.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "setup fits the mobile viewport");
       await Promise.all([frame.waitForNavigation(), frame.tap('a[target="_self"]')]);
       assert.equal(frame.url(), fixture.origin + fixture.base + "/");
     } finally { await browser?.close(); await fixture.close(); }
