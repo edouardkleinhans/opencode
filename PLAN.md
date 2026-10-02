@@ -24,9 +24,26 @@ the remaining list current instead of accumulating historical plans.
   replacing the pairing. HA's translation loader also confirms both button labels.
 - Release companion: `/tmp/opencode/ha-release-artifacts-3.2.0b5/opencode-assist.zip`,
   SHA256 `2ecdb5c972389c1525c34724605f30a26662cf585466182884ce5bd8190398c8`.
-- User approved committing, pushing and releasing **3.2.0b5**. Verify CI and
-  both native architecture images before tagging; the release workflow advances
-  the HA storefront after images are available.
+- Published [beta 3.2.0b5](https://github.com/magnusoverli/opencode/releases/tag/beta-v3.2.0b5)
+  from `f77cc3c0d173585aba195d20501daa4b0e05b4a2` with the user's approval to
+  commit, push and release. Storefront commit `79fceab` advertises b5.
+- Main CI `36995221591` passed: **299 beta tests / 2 environment skips**, all
+  **20 HA 2026.10 contracts**, and **19 shared MCP discovery tests**. Native
+  amd64/ARM64 checks `36995221542` and pre-tag publication `36995227626` passed;
+  both images were available before tagging. Release workflow `36995714981`
+  and tag-build/publication `36995714895` also passed.
+- The released `image-manifest.txt` matches the final registry index:
+  `sha256:e9815c0b68b8dd6d1471af5e7425a8353a6d7961e57645c98c6c229e31b7169b`.
+  Platform manifests: amd64
+  `sha256:b7f9ca453ea1cec2aa11c045a635bd0780da54e18efc9b93720c55fb0dac4f2d`;
+  ARM64 `sha256:6e866ad2f7de9882eea267fec1fb31eca109afb8a70a0197c86e08ba21820538`.
+- Downloaded release assets under `/tmp/opencode/ha-release-artifacts-3.2.0b5/published/`.
+  The companion ZIP matches the candidate and all **13 source files**. Pulled
+  the final amd64 image by digest: version/architecture labels are correct,
+  OpenCode remains **2.0.13**, and all **13 bundled companion files** match the
+  release ZIP byte-for-byte.
+- Posted the release update to [#45](https://github.com/magnusoverli/opencode/issues/45#issuecomment-5950472153);
+  the broader native-integration roadmap remains open.
 
 ## Adding the second Assist entity — beta 3.2.0b4
 
