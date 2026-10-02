@@ -6,13 +6,30 @@ the remaining list current instead of accumulating historical plans.
 
 ## Assist setup improvements — beta 3.2.0b1 release
 
-- Worktree: `feat/assist-setup`, based on published 3.2.0b0/main `7b92996`.
+- Published [beta 3.2.0b1](https://github.com/magnusoverli/opencode/releases/tag/beta-v3.2.0b1)
+  at `5c100ffe2b9acbdd962054224496a7ea27342689`, based on b0/main `7b92996`.
 - User authorized consolidating all outstanding work on `main`, committing and
   pushing it, and publishing **3.2.0b1**. Include the previously retained Lemonade
   guidance and contributor credits; older native-integration edits are already
   represented by the published b0 implementation.
-- [ ] Pass main CI/native amd64+arm64 checks, publish both final images, then tag
-  `beta-v3.2.0b1` and verify the release, companion ZIP and storefront update.
+- Consolidation complete: all unique Assist, Lemonade and contributor-credit
+  changes are committed/pushed to `main`. Completed feature/release branches
+  were removed; the original worktree is back on clean `main`. Its pre-consolidation
+  edits are also preserved in local safety stash `079a14863b149c5320f011389c2948532c56a8ca`.
+- Main CI `36974043252` and native amd64/arm64 checks `36974043260` passed.
+  Final images were published by `36974230881` before the tag was pushed.
+  Release workflow `36974663901` succeeded; storefront commit `a0c3414` advertises
+  `3.2.0b1`. The downloaded companion ZIP matches the final source package:
+  SHA256 `e9afde4b96bcf38beae5c42c6e8c92916be288fb49e8dd921c00e5f5c91b6f73`.
+- Tag-build `36974663888` passed both native boundaries and image publications.
+  All three release assets are uploaded; the downloaded `image-manifest.txt`
+  agrees with the registry index:
+  `sha256:e97e4cc1b1ba1dd8c76dd3506036f302dccff47357d3a1eec2bdabd1899a386a`.
+  Platform manifests: amd64
+  `sha256:0e55385fc2180a3852ff9afe2ca7d49226d1c7d38def305dad03284c8b9420da`;
+  arm64 `sha256:19a07eda22b3e9c111af2f252439e4705e00535bc601c700be11da8d9ea60dcf`.
+  Pulled the published amd64 image by digest and verified all 12 companion files
+  match the downloaded release ZIP byte-for-byte (isolated, no HA config mounted).
 - One canonical companion source now lives in
   `ha_opencode_beta/rootfs/opt/opencode-assist/custom_components/opencode_assist`.
   The image's normal rootfs copy and the release ZIP both use it; no runtime
