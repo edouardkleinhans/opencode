@@ -34,7 +34,7 @@ for (const mode of ["terminal", "openchamber"]) {
     } finally { await fixture.close(); }
   });
 
-  test(`${mode}: mobile Ingress iframe navigates to automatic setup and back`, { skip: !browserPath && "set HA_ASSIST_BROWSER_EXECUTABLE for rendered mobile checks", timeout: 30000 }, async () => {
+  test(`${mode}: mobile Ingress opens setup first and existing integration after pairing`, { skip: !browserPath && "set HA_ASSIST_BROWSER_EXECUTABLE for rendered mobile checks", timeout: 30000 }, async () => {
     const fixture = await startAssistUiFixture(mode);
     const puppeteer = mcpRequire("puppeteer-core");
     let browser;
@@ -60,6 +60,15 @@ for (const mode of ["terminal", "openchamber"]) {
       assert.equal(await frame.$("form"), null);
       assert.equal(await frame.$eval('a[target="_top"]', (link) => link.href), "https://my.home-assistant.io/redirect/config_flow_start/?domain=opencode_assist");
       assert.ok(await frame.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "setup fits the mobile viewport");
+      fixture.pairing.provision("a".repeat(43));
+      const owner = fixture.pairing.owner;
+      await frame.goto(frame.url());
+      assert.equal(await frame.$eval('a[target="_top"]', (link) => link.href), "https://my.home-assistant.io/redirect/integration/?domain=opencode_assist");
+      assert.match(await frame.content(), /Add conversation agent/);
+      assert.match(await frame.content(), /Add AI data task/);
+      assert.doesNotMatch(await frame.content(), /config_flow_start/);
+      assert.equal(fixture.pairing.owner, owner, "returning to setup preserves the existing pairing");
+      assert.ok(await frame.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "paired setup fits the mobile viewport");
       await Promise.all([frame.waitForNavigation(), frame.tap('a[target="_self"]')]);
       assert.equal(frame.url(), fixture.origin + fixture.base + "/");
     } finally { await browser?.close(); await fixture.close(); }

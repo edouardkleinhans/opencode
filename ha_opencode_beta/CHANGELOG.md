@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## 3.2.0b4
+
+- Label HA's Add conversation agent / Add AI data task buttons and open the existing integration from paired setup so both entity types can be added.
+- Replace the unhelpful "already configured" message with a link and instructions for adding entities to the existing connection; distinguish Add app connection from Add conversation agent and Add AI data task.
+- Bundle companion **0.1.0b5**. Update the app, then restart **Home Assistant Core** to load the new labels. Open Settings → Devices & services → OpenCode Assist → **Add conversation agent** to add Assist alongside an existing AI data task. Existing pairings, model settings and entities are retained.
+- Verify adding either entity type first, then the other, with HA 2026.10 and the existing pairing. OpenCode remains pinned to **2.0.13**; native Assist remains experimental ([#45](https://github.com/magnusoverli/opencode/issues/45)).
+
 ## 3.2.0b3
 
 - Explain both Assist setup choices beneath their labels and clarify that both can be added, one at a time.

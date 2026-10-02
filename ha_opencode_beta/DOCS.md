@@ -2,7 +2,7 @@
 
 This is the **beta channel** for the OpenCode add-on. It contains experimental features and fixes that are being validated before inclusion in the stable release.
 
-Beta **3.2.0b3** is based on **stable 3.1.0**, with the same pinned OpenCode `2.0.13`
+Beta **3.2.0b4** is based on **stable 3.1.0**, with the same pinned OpenCode `2.0.13`
 runtime. HA 2026.10 integration includes native LLM API discovery, prompt/context
 forwarding and an experimental native Assist/AI data-task adapter. The roadmap
 is tracked in [#45](https://github.com/magnusoverli/opencode/issues/45).
@@ -37,9 +37,18 @@ OpenCode Assist** uses the same Supervisor discovery flow.
 
 API choices come from HA's current registry and default to none; select Assist
 explicitly for home control. Select the resulting conversation entity in your
-Assist pipeline, or the AI task entity for `ai_task.generate_data`. Additional
-agents/tasks can be added as subentries. This is independent of the app's outgoing
-native-MCP option.
+Assist pipeline, or the AI task entity for `ai_task.generate_data`. To add the
+other type, open **Settings → Devices & services → OpenCode Assist** and use its
+add-entity buttons (also in the existing app connection's overflow menu). Both
+share the current pairing, with independent model settings. Starting **Add
+integration** again attempts a second app connection. This is independent of the
+app's outgoing native-MCP option.
+
+**3.2.0b4:** the integration page now labels these buttons **Add
+conversation agent** and **Add AI data task**; 3.2.0b3 omitted their translation
+keys, leaving the add-entity controls unlabeled. Repeat setup now explains the
+correct path and links to the existing integration. Once paired, the app's setup
+page opens that integration directly instead of starting another connection flow.
 
 The installer atomically installs or updates only an unmodified app-managed
 copy. A manual installation (including the 3.2.0b0 ZIP) or edited files produce a

@@ -16,7 +16,8 @@ export async function startAssistUiFixture(mode) {
   const base = "/api/hassio_ingress/ios_fixture";
   const admin = "a".repeat(32);
   let user = admin;
-  const worker = await startAssistHttp({ client: { rpc: () => ({}) }, pairing: openAssistPairing(directory),
+  const pairing = openAssistPairing(directory);
+  const worker = await startAssistHttp({ client: { rpc: () => ({}) }, pairing,
     ingressSecret: "fixture-secret", verifyAdmin: async (id) => id === admin, discovery: { published: true },
     coreHost: "127.0.0.1", corePort: 0, ipcPort: 0, installation: { version: "0.1.0b3", installed_at: "2026-10-02T10:00:00Z" } });
   // Match the pinned ttyd/container and OpenChamber fullscreen layout contracts.
@@ -59,6 +60,6 @@ export async function startAssistUiFixture(mode) {
   });
   await listen(gateway);
   origin = `http://127.0.0.1:${gateway.address().port}`;
-  return { origin, base, port, setUser: (value) => { user = value; },
+  return { origin, base, port, pairing, setUser: (value) => { user = value; },
     async close() { await close(gateway); child.kill(); await once(child, "exit"); await close(upstream); await worker.close(); await rm(directory, { recursive: true, force: true }); } };
 }

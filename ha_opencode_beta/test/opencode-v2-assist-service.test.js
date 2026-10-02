@@ -133,6 +133,10 @@ test("Supervisor bootstrap pairs without browser credentials and HA revocation c
     }
     const setupPage = await (await fetch(ipc, { headers })).text();
     assert.ok(!setupPage.includes(key) && !setupPage.includes(ticket), "browser pages never display credentials");
+    assert.match(setupPage, /redirect\/integration\/\?domain=opencode_assist/);
+    assert.match(setupPage, /Add conversation agent/);
+    assert.match(setupPage, /Add AI data task/);
+    assert.doesNotMatch(setupPage, /config_flow_start/);
     assert.equal((await fetch(base + "/v1/pairing", { method: "DELETE", headers: auth })).status, 200);
     while (!(await reader.read()).done) { /* drain cancellation event */ }
     assert.equal((await fetch(base + "/v1/info", { headers: auth })).status, 401);

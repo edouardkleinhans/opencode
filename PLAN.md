@@ -4,6 +4,36 @@ Updated: 2026-10-02. This is the single shared plan for this work, tracked in Gi
 Only open tasks appear as checkboxes; close them with concrete evidence and keep
 the remaining list current instead of accumulating historical plans.
 
+## Adding the second Assist entity — beta 3.2.0b4
+
+- User added an AI data task in 3.2.0b3, then re-entered the app-connection flow
+  and received "This app is already configured". The duplicate-connection guard
+  is correct, but the message gave no route to adding a second entity.
+- Found missing HA `config_subentries.<type>.initiate_flow.user` and
+  `.reconfigure` translations, plus `entry_type` labels. Frontend 20260930.0
+  reads those exact keys for the integration-page add buttons, overflow actions
+  and entity-type labels; our former `title` keys did not label those controls.
+- Companion **0.1.0b5** restores the native **Add conversation agent** and
+  **Add AI data task** actions, distinguishes **Add app connection**, and links
+  repeat setup to the existing integration with explicit instructions. Initial
+  setup now says where to add the second type later. Pairing and entity creation
+  continue through HA's existing config-entry/subentry paths.
+- The paired Ingress setup page now links to HA's existing integration page
+  (`my.home-assistant.io/redirect/integration/?domain=opencode_assist`), with
+  instructions for both entity types. First-time setup retains the config-flow
+  link. Returning through the app no longer starts a duplicate connection flow.
+- Verification: all **17 actual HA 2026.10.0b0 contracts** passed, including
+  AI-task-first and conversation-first additions, preservation of the first
+  entity and pairing, and HA's real translation loader resolving the exact
+  integration-page/overflow action keys. All **8 targeted service/Ingress UI
+  tests** passed, including rendered mobile Chromium checks of the paired and
+  unpaired links in both terminal and OpenChamber modes.
+- Release companion **0.1.0b5** at `/tmp/opencode/ha-release-artifacts-3.2.0b4/opencode-assist.zip`;
+  SHA256 `07bfd7a2536808599fc0edb6454cbee4424ca5c06d973eada7f7ba986a6430ea`.
+- User approved committing, pushing and releasing **3.2.0b4**. Verify CI and
+  both native architecture images before tagging; the release workflow advances
+  the HA storefront after images are available.
+
 ## Assist setup explanations and restart notification — beta 3.2.0b3
 
 - User requested short explanations below both onboarding choices, a note that

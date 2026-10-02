@@ -6,6 +6,7 @@ import os
 import tempfile
 import time
 import unittest
+from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID
@@ -13,12 +14,14 @@ from uuid import UUID
 import aiohttp
 import probatio
 from aiohasupervisor import SupervisorError
+from homeassistant import loader
 from homeassistant.components import conversation, ai_task, persistent_notification
 from aiohasupervisor.models import Discovery
 from homeassistant.config_entries import ConfigEntries, ConfigSubentry, ConfigEntryState, FlowType
 from homeassistant.core import Context, HomeAssistant
 from homeassistant.exceptions import ConfigEntryError, HomeAssistantError
 from homeassistant.helpers import llm
+from homeassistant.helpers.translation import async_get_translations
 from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 from homeassistant.components.hassio.discovery import HassIODiscovery
 
@@ -316,11 +319,65 @@ class OnboardingContracts(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("llm_hass_api", values)
         await self.hass.config_entries.subentries.async_configure(form["flow_id"], values)
         self.assertEqual(next(iter(result["result"].subentries.values())).subentry_type, "ai_task_data")
+        entry = result["result"]
+        data, previous = dict(entry.data), dict(entry.subentries)
+        self.client.onboard.reset_mock()
+        # Reopening Add integration is not the same action as Add conversation
+        # agent on the existing integration page. It must preserve that pairing.
+        repeated = await self.start("user")
+        self.assertEqual(repeated["reason"], "already_configured")
         # Choosing AI tasks first never excludes adding conversation later.
         additional = await self.hass.config_entries.subentries.async_init(
-            (result["result"].entry_id, "conversation"), context={"source": "user"})
-        await self.hass.config_entries.subentries.async_configure(additional["flow_id"], {"model": "fixture/coding", "llm_hass_api": []})
-        self.assertEqual({entry.subentry_type for entry in result["result"].subentries.values()}, {"ai_task_data", "conversation"})
+            (entry.entry_id, "conversation"), context={"source": "user"})
+        additional_values = additional["data_schema"]({"model": "fixture/coding"})
+        self.assertEqual(additional_values["llm_hass_api"], [])
+        await self.hass.config_entries.subentries.async_configure(additional["flow_id"], additional_values)
+        self.assertEqual({subentry.subentry_type for subentry in entry.subentries.values()}, {"ai_task_data", "conversation"})
+        self.assertEqual(dict(entry.data), data)
+        for subentry_id, subentry in previous.items():
+            self.assertIs(entry.subentries[subentry_id], subentry)
+        self.assertEqual(len(self.hass.config_entries.async_entries("opencode_assist")), 1)
+        self.client.onboard.assert_not_awaited()
+
+    async def test_conversation_first_then_ai_task_uses_existing_pairing(self):
+        created = await self.create()
+        entry = created["result"]
+        await self.hass.config_entries.subentries.async_configure(created["next_flow"][1], {"model": "fixture/coding", "llm_hass_api": []})
+        data, previous = dict(entry.data), dict(entry.subentries)
+        self.client.onboard.reset_mock()
+        additional = await self.hass.config_entries.subentries.async_init(
+            (entry.entry_id, "ai_task_data"), context={"source": "user"})
+        values = additional["data_schema"]({"model": "fixture/coding"})
+        self.assertNotIn("llm_hass_api", values)
+        completed = await self.hass.config_entries.subentries.async_configure(additional["flow_id"], values)
+        self.assertEqual(completed["type"], "create_entry")
+        self.assertEqual({subentry.subentry_type for subentry in entry.subentries.values()}, {"ai_task_data", "conversation"})
+        self.assertEqual(dict(entry.data), data)
+        for subentry_id, subentry in previous.items():
+            self.assertIs(entry.subentries[subentry_id], subentry)
+        self.assertEqual(len(self.hass.config_entries.async_entries("opencode_assist")), 1)
+        self.client.onboard.assert_not_awaited()
+
+    async def test_ha_loads_labels_for_integration_page_and_subentry_actions(self):
+        # HA's frontend reads initiate_flow and entry_type, NOT a subentry title.
+        # Go through Core's custom-integration translation loader so missing or
+        # misnested shipped keys cannot pass as they did in the flow-only tests.
+        loader.async_setup(self.hass)
+        labels = await async_get_translations(self.hass, "en", "config_subentries", {"opencode_assist"})
+        for kind, name in (("conversation", "conversation agent"), ("ai_task_data", "AI data task")):
+            prefix = f"component.opencode_assist.config_subentries.{kind}"
+            self.assertEqual(labels[f"{prefix}.initiate_flow.user"], f"Add {name}")
+            self.assertEqual(labels[f"{prefix}.initiate_flow.reconfigure"], f"Reconfigure {name}")
+            self.assertTrue(labels[f"{prefix}.entry_type"])
+        config = await async_get_translations(self.hass, "en", "config", {"opencode_assist"})
+        self.assertEqual(config["component.opencode_assist.config.initiate_flow.user"], "Add app connection")
+        guidance = config["component.opencode_assist.config.abort.already_configured"]
+        self.assertIn("/config/integrations/integration/opencode_assist", guidance)
+        self.assertIn("Add conversation agent", guidance)
+        self.assertIn("Add AI data task", guidance)
+        integration = await loader.async_get_integration(self.hass, "opencode_assist")
+        path = Path(integration.file_path)
+        self.assertEqual(json.loads((path / "strings.json").read_text()), json.loads((path / "translations/en.json").read_text()))
 
     async def test_backend_lost_before_subentry_keeps_entry_without_broken_next_flow(self):
         self.client.info.side_effect = HomeAssistantError("fixture offline")

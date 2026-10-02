@@ -1,8 +1,8 @@
 # OpenCode Assist companion (experimental)
 
-Targets **Home Assistant 2026.10 with Supervisor**. Companion **0.1.0b4** in beta **3.2.0b3**
-adds descriptive setup choices and an HA restart notification to the
-Supervisor-only onboarding introduced in beta **3.2.0b2**.
+Targets **Home Assistant 2026.10 with Supervisor**. Companion **0.1.0b5** in beta **3.2.0b4**
+labels HA's add-entity actions and clarifies how to add both entity types to the
+Supervisor-only connection introduced in beta **3.2.0b2**.
 
 1. Configure a supported provider/model in OpenCode. Enable `ha_assist_enabled`
    in the beta app options and restart the app. It installs the bundled companion
@@ -21,6 +21,14 @@ Supervisor-only onboarding introduced in beta **3.2.0b2**.
    conversations, the HA APIs to expose. No APIs are selected automatically.
    Select the conversation entity in your Assist pipeline or the AI task entity
    for `ai_task.generate_data`.
+
+To add the other type later, open **Settings → Devices & services → OpenCode
+Assist**, then select **Add conversation agent** or **Add AI data task**. These
+buttons also appear in the existing app connection's overflow menu. **Add app
+connection** creates a separate app connection; it is not the add-entity action.
+Both entity types share the existing pairing, and each has its own model settings.
+Once paired, the app's **Set up OpenCode Assist** page opens the existing
+integration so you can add the second type there.
 
 The image and release `opencode-assist.zip` use this same source directory; no
 integration code is downloaded at runtime. Automatic installation only updates
