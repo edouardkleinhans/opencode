@@ -30,9 +30,26 @@ the remaining list current instead of accumulating historical plans.
   unpaired links in both terminal and OpenChamber modes.
 - Release companion **0.1.0b5** at `/tmp/opencode/ha-release-artifacts-3.2.0b4/opencode-assist.zip`;
   SHA256 `07bfd7a2536808599fc0edb6454cbee4424ca5c06d973eada7f7ba986a6430ea`.
-- User approved committing, pushing and releasing **3.2.0b4**. Verify CI and
-  both native architecture images before tagging; the release workflow advances
-  the HA storefront after images are available.
+- Published [beta 3.2.0b4](https://github.com/magnusoverli/opencode/releases/tag/beta-v3.2.0b4)
+  from `f43c24fc323f6ef8c349614677097aa1f2094268` with the user's approval to
+  commit, push and release. Storefront commit `f4efb51` advertises b4.
+- Main CI `36992140448` passed: **299 beta tests / 2 environment skips**, all
+  **17 HA 2026.10 contracts**, and **19 shared MCP discovery tests**. Native
+  amd64/ARM64 checks `36992140461` and pre-tag publication `36992152870` passed;
+  both images were available before tagging. Release workflow `36992666841`
+  and tag-build/publication `36992666780` also passed.
+- The released `image-manifest.txt` matches the final registry index:
+  `sha256:4d4db0ac923e95c76d5d42af6c70571782995c7ed9099a259ed4dcb535bb437e`.
+  Platform manifests: amd64
+  `sha256:e26b1bfd29afbe8ad9211fcf9707820819428fe494aeb04572b01d32909486e9`;
+  ARM64 `sha256:8a8a252339a1ea81c612d7314cb607088febf3b6482c890db5edc3e8617a0ca5`.
+- Downloaded release assets under `/tmp/opencode/ha-release-artifacts-3.2.0b4/published/`.
+  The companion ZIP matches the candidate and all **13 source files**. Pulled
+  the final amd64 image by digest: version/architecture labels are correct,
+  OpenCode remains **2.0.13**, paired setup routing matches the source, and
+  all **13 bundled companion files** match the release ZIP byte-for-byte.
+- Posted the release update to [#45](https://github.com/magnusoverli/opencode/issues/45#issuecomment-5949817038);
+  the broader native-integration roadmap remains open.
 
 ## Assist setup explanations and restart notification — beta 3.2.0b3
 
