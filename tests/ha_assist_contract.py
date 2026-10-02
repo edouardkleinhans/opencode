@@ -20,7 +20,7 @@ from aiohasupervisor.models import Discovery
 from homeassistant.config_entries import ConfigEntries, ConfigSubentry, ConfigEntryState, FlowType
 from homeassistant.core import Context, HomeAssistant
 from homeassistant.exceptions import ConfigEntryError, HomeAssistantError
-from homeassistant.helpers import llm
+from homeassistant.helpers import device_registry as dr, entity_registry as er, llm
 from homeassistant.helpers.translation import async_get_translations
 from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 from homeassistant.components.hassio.discovery import HassIODiscovery
@@ -358,6 +358,92 @@ class OnboardingContracts(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.hass.config_entries.async_entries("opencode_assist")), 1)
         self.client.onboard.assert_not_awaited()
 
+    async def test_duplicate_types_are_rejected_but_both_remain_configurable(self):
+        created = await self.create()
+        entry = created["result"]
+        await self.hass.config_entries.subentries.async_configure(created["next_flow"][1], {"model": "fixture/coding", "llm_hass_api": []})
+        task = await self.hass.config_entries.subentries.async_init((entry.entry_id, "ai_task_data"), context={"source": "user"})
+        await self.hass.config_entries.subentries.async_configure(task["flow_id"], {"model": "fixture/coding"})
+        data, ids = dict(entry.data), set(entry.subentries)
+        self.client.onboard.reset_mock()
+        for subentry in list(entry.subentries.values()):
+            kind = subentry.subentry_type
+            self.assertEqual(subentry.unique_id, kind)
+            # Older companions wrote no unique IDs. The type guard must also
+            # recognize those existing services without rewriting their data.
+            self.hass.config_entries.async_update_subentry(entry, subentry, unique_id=None)
+            self.client.info.reset_mock()
+            duplicate = await self.hass.config_entries.subentries.async_init((entry.entry_id, kind), context={"source": "user"})
+            self.assertEqual(duplicate["type"], "abort")
+            self.assertEqual(duplicate["reason"], "already_configured")
+            self.client.info.assert_not_awaited()
+            self.assertTrue(entry.supported_subentry_types[kind]["supports_reconfigure"])
+            form = await self.hass.config_entries.subentries.async_init((entry.entry_id, kind),
+                context={"source": "reconfigure", "subentry_id": subentry.subentry_id})
+            self.assertEqual(form["type"], "form")
+            values = {"model": "fixture/coding"}
+            if kind == "conversation":
+                values.update(llm_hass_api=["assist"], prompt="Changed fixture instructions")
+            result = await self.hass.config_entries.subentries.async_configure(form["flow_id"], values)
+            self.assertEqual(result["reason"], "reconfigure_successful")
+            self.assertEqual(dict(entry.subentries[subentry.subentry_id].data), values)
+        self.assertEqual(set(entry.subentries), ids)
+        self.assertEqual(dict(entry.data), data)
+        self.client.onboard.assert_not_awaited()
+
+    async def test_concurrent_forms_create_only_one_of_each_type(self):
+        created = await self.create("ai_task_data")
+        entry = created["result"]
+        self.hass.config_entries.subentries.async_abort(created["next_flow"][1])
+        for kind in ("conversation", "ai_task_data"):
+            first = await self.hass.config_entries.subentries.async_init((entry.entry_id, kind), context={"source": "user"})
+            second = await self.hass.config_entries.subentries.async_init((entry.entry_id, kind), context={"source": "user"})
+            ready, release = asyncio.Event(), asyncio.Event()
+            started = 0
+            async def delayed_info():
+                nonlocal started
+                started += 1
+                if started == 2:
+                    ready.set()
+                await release.wait()
+                return self.info
+            self.client.info.side_effect = delayed_info
+            pending = [asyncio.create_task(self.hass.config_entries.subentries.async_configure(
+                form["flow_id"], {"model": "fixture/coding"})) for form in (first, second)]
+            try:
+                await asyncio.wait_for(ready.wait(), 5)
+                release.set()
+                results = await asyncio.wait_for(asyncio.gather(*pending), 5)
+            finally:
+                release.set()
+                for task in pending:
+                    task.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
+                self.client.info.side_effect = None
+            self.assertEqual(sorted(result["type"] for result in results), ["abort", "create_entry"])
+            self.assertEqual(next(result for result in results if result["type"] == "abort")["reason"], "already_configured")
+            self.assertEqual(len(entry.get_subentries_of_type(kind)), 1)
+        self.assertEqual(len(entry.subentries), 2)
+
+    async def test_removed_type_can_be_added_again_without_repairing(self):
+        dr.async_setup(self.hass)
+        await dr.async_load(self.hass, load_empty=True)
+        await er.async_load(self.hass, load_empty=True)
+        created = await self.create("ai_task_data")
+        entry = created["result"]
+        await self.hass.config_entries.subentries.async_configure(created["next_flow"][1], {"model": "fixture/coding"})
+        original = next(iter(entry.subentries.values()))
+        key = entry.data["api_key"]
+        self.client.onboard.reset_mock()
+        self.hass.config_entries.async_remove_subentry(entry, original.subentry_id)
+        form = await self.hass.config_entries.subentries.async_init((entry.entry_id, "ai_task_data"), context={"source": "user"})
+        result = await self.hass.config_entries.subentries.async_configure(form["flow_id"], {"model": "fixture/coding"})
+        self.assertEqual(result["type"], "create_entry")
+        self.assertEqual(len(entry.subentries), 1)
+        self.assertNotIn(original.subentry_id, entry.subentries)
+        self.assertEqual(entry.data["api_key"], key)
+        self.client.onboard.assert_not_awaited()
+
     async def test_ha_loads_labels_for_integration_page_and_subentry_actions(self):
         # HA's frontend reads initiate_flow and entry_type, NOT a subentry title.
         # Go through Core's custom-integration translation loader so missing or
@@ -369,6 +455,7 @@ class OnboardingContracts(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(labels[f"{prefix}.initiate_flow.user"], f"Add {name}")
             self.assertEqual(labels[f"{prefix}.initiate_flow.reconfigure"], f"Reconfigure {name}")
             self.assertTrue(labels[f"{prefix}.entry_type"])
+            self.assertIn("Configure", labels[f"{prefix}.abort.already_configured"])
         config = await async_get_translations(self.hass, "en", "config", {"opencode_assist"})
         self.assertEqual(config["component.opencode_assist.config.initiate_flow.user"], "Add app connection")
         guidance = config["component.opencode_assist.config.abort.already_configured"]

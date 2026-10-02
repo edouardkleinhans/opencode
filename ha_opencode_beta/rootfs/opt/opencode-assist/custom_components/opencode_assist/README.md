@@ -1,8 +1,9 @@
 # OpenCode Assist companion (experimental)
 
-Targets **Home Assistant 2026.10 with Supervisor**. Companion **0.1.0b5** in beta **3.2.0b4**
-labels HA's add-entity actions and clarifies how to add both entity types to the
-Supervisor-only connection introduced in beta **3.2.0b2**.
+Targets **Home Assistant 2026.10 with Supervisor**. Companion **0.1.0b6** in beta **3.2.0b5**
+limits each app connection to one conversation agent and one AI data task.
+Existing entities remain configurable; duplicate setup shows guidance instead
+of adding another entity of the same type.
 
 1. Configure a supported provider/model in OpenCode. Enable `ha_assist_enabled`
    in the beta app options and restart the app. It installs the bundled companion
@@ -27,6 +28,11 @@ Assist**, then select **Add conversation agent** or **Add AI data task**. These
 buttons also appear in the existing app connection's overflow menu. **Add app
 connection** creates a separate app connection; it is not the add-entity action.
 Both entity types share the existing pairing, and each has its own model settings.
+Use an existing entity's **Configure** button to change its settings. HA 2026.10
+uses the same supported-type declaration for Add and Configure, so the Add buttons
+remain visible even after a type has been added; duplicate creation is rejected.
+Removing a service lets you add that type again. Existing duplicate entities from
+earlier versions are retained and can still be configured or removed individually.
 Once paired, the app's **Set up OpenCode Assist** page opens the existing
 integration so you can add the second type there.
 

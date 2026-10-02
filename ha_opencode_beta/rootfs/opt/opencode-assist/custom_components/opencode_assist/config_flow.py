@@ -7,7 +7,7 @@ import probatio
 from homeassistant.config_entries import ConfigFlow, ConfigSubentryFlow, ConfigEntryState, FlowType, SOURCE_USER
 from homeassistant.const import CONF_API_KEY, CONF_LLM_HASS_API, CONF_MODEL, CONF_PROMPT, CONF_URL
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.data_entry_flow import AbortFlow, FlowResultType
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import llm
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -143,10 +143,19 @@ class OpenCodeFlow(ConfigFlow, domain=DOMAIN):
     @classmethod
     @callback
     def async_get_supported_subentry_types(cls, config_entry):
+        # HA uses this map for both Add buttons and existing subentry
+        # reconfiguration. Filtering out an installed type breaks Configure.
         return {"conversation": OpenCodeSubentryFlow, "ai_task_data": OpenCodeSubentryFlow}
 
 
 class OpenCodeSubentryFlow(ConfigSubentryFlow):
+    @callback
+    def _abort_if_type_configured(self, entry):
+        if self.source == SOURCE_USER and any(
+            subentry.subentry_type == self._subentry_type for subentry in entry.subentries.values()
+        ):
+            raise AbortFlow("already_configured")
+
     async def async_step_user(self, user_input=None):
         return await self._options(user_input)
 
@@ -155,6 +164,7 @@ class OpenCodeSubentryFlow(ConfigSubentryFlow):
 
     async def _options(self, user_input):
         entry = self._get_entry()
+        self._abort_if_type_configured(entry)
         if entry.state is not ConfigEntryState.LOADED:
             return self.async_abort(reason="entry_not_loaded")
         try:
@@ -164,6 +174,9 @@ class OpenCodeSubentryFlow(ConfigSubentryFlow):
             return self.async_abort(reason="invalid_auth")
         except HomeAssistantError:
             return self.async_abort(reason="cannot_connect")
+        # Another open dialog may have added this type while info() awaited
+        # the backend. Recheck before the synchronous validation/create path.
+        self._abort_if_type_configured(entry)
         models = {f"{m['providerID']}/{m['id']}": m for m in info["models"]}
         apis = {api.id: api.name for api in llm.async_get_apis(self.hass)}
         errors = {}
@@ -177,7 +190,8 @@ class OpenCodeSubentryFlow(ConfigSubentryFlow):
             else:
                 if self.source == "reconfigure":
                     return self.async_update_and_abort(entry, self._get_reconfigure_subentry(), data=user_input)
-                return self.async_create_entry(title="OpenCode conversation" if self._subentry_type == "conversation" else "OpenCode AI task", data=user_input)
+                return self.async_create_entry(title="OpenCode conversation" if self._subentry_type == "conversation" else "OpenCode AI task", data=user_input,
+                    unique_id=self._subentry_type)
         defaults = self._get_reconfigure_subentry().data if self.source == "reconfigure" else {}
         fields = {probatio.Required(CONF_MODEL, description={"suggested_value": defaults.get(CONF_MODEL)}): SelectSelector(SelectSelectorConfig(
             options=[{"value": key, "label": f"{model['name']} ({key})"} for key, model in models.items()]))}

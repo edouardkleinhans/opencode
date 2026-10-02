@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## 3.2.0b5
+
+- Limit each Assist app connection to one conversation agent and one AI data task, with clear duplicate-setup guidance and existing Configure actions retained.
+- Prevent duplicates from simultaneous setup dialogs and recognize services created by earlier companion versions. Removing a service allows that type to be added again; existing pairings and entities are retained.
+- HA 2026.10 still displays both Add buttons because hiding a supported type would also remove Configure. Selecting an already configured type now explains how to edit the existing service.
+- Bundle companion **0.1.0b6**. Update the app, then restart **Home Assistant Core** to load the change. OpenCode remains pinned to **2.0.13**; native Assist remains experimental ([#45](https://github.com/magnusoverli/opencode/issues/45)).
+
 ## 3.2.0b4
 
 - Label HA's Add conversation agent / Add AI data task buttons and open the existing integration from paired setup so both entity types can be added.

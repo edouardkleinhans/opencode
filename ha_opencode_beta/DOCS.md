@@ -2,7 +2,7 @@
 
 This is the **beta channel** for the OpenCode add-on. It contains experimental features and fixes that are being validated before inclusion in the stable release.
 
-Beta **3.2.0b4** is based on **stable 3.1.0**, with the same pinned OpenCode `2.0.13`
+Beta **3.2.0b5** is based on **stable 3.1.0**, with the same pinned OpenCode `2.0.13`
 runtime. HA 2026.10 integration includes native LLM API discovery, prompt/context
 forwarding and an experimental native Assist/AI data-task adapter. The roadmap
 is tracked in [#45](https://github.com/magnusoverli/opencode/issues/45).
@@ -49,6 +49,12 @@ conversation agent** and **Add AI data task**; 3.2.0b3 omitted their translation
 keys, leaving the add-entity controls unlabeled. Repeat setup now explains the
 correct path and links to the existing integration. Once paired, the app's setup
 page opens that integration directly instead of starting another connection flow.
+
+**3.2.0b5:** each app connection allows one conversation agent and one AI data
+task. Use **Configure** to edit an existing service. HA 2026.10 keeps the Add buttons
+visible because the same type declaration also enables Configure; trying to add
+an existing type shows guidance and creates no duplicate. Removing a service
+allows it to be added again. Existing duplicates from earlier versions are retained.
 
 The installer atomically installs or updates only an unmodified app-managed
 copy. A manual installation (including the 3.2.0b0 ZIP) or edited files produce a

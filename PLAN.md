@@ -4,6 +4,30 @@ Updated: 2026-10-02. This is the single shared plan for this work, tracked in Gi
 Only open tasks appear as checkboxes; close them with concrete evidence and keep
 the remaining list current instead of accumulating historical plans.
 
+## One of each Assist entity — beta 3.2.0b5
+
+- User requested one conversation agent and one AI data task per app connection,
+  with only unconfigured types shown as Add actions. The labels themselves were
+  shipped in beta 3.2.0b4 / companion 0.1.0b5 and require a Core restart to load.
+- Pinned HA Core 2026.10.0b0 and frontend 20260930.0 use the same
+  `supported_subentry_types` map for Add buttons, Configure visibility and flow
+  handler lookup. There is no separate add-availability flag. Filtering out a
+  configured type removes its Configure control and breaks reconfiguration;
+  hiding only Add requires upstream HA support. Keep the supported handlers.
+- Companion **0.1.0b6** enforces one of each type at flow entry and again after
+  awaiting model discovery, with a type-specific subentry unique ID as a final
+  registry guard. Duplicate messages point to Configure. Existing unkeyed or
+  duplicate entities are kept, and reconfiguration remains available.
+- All **20 actual HA 2026.10.0b0 contracts** passed: both addition orders,
+  duplicate attempts against earlier unkeyed entries, concurrent form submissions
+  for each type, Configure after both types exist, and removal/re-addition without
+  replacing the pairing. HA's translation loader also confirms both button labels.
+- Release companion: `/tmp/opencode/ha-release-artifacts-3.2.0b5/opencode-assist.zip`,
+  SHA256 `2ecdb5c972389c1525c34724605f30a26662cf585466182884ce5bd8190398c8`.
+- User approved committing, pushing and releasing **3.2.0b5**. Verify CI and
+  both native architecture images before tagging; the release workflow advances
+  the HA storefront after images are available.
+
 ## Adding the second Assist entity — beta 3.2.0b4
 
 - User added an AI data task in 3.2.0b3, then re-entered the app-connection flow
