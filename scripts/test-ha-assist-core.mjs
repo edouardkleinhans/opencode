@@ -25,7 +25,7 @@ try {
   // config, secrets or provider credentials are mounted into the test container.
   const child = spawn("docker", ["run", "--rm", "--network", "host", "--entrypoint", "python",
     "-e", "PYTHONPATH=/work", "-e", "PYTHONDONTWRITEBYTECODE=1", "-e", `ASSIST_FIXTURE_URL=http://127.0.0.1:${server.address().port}`,
-    "-v", `${root}custom_components:/work/custom_components:ro`, "-v", `${root}tests/ha_assist_contract.py:/work/ha_assist_contract.py:ro`, "-w", "/work",
+    "-v", `${root}ha_opencode_beta/rootfs/opt/opencode-assist/custom_components:/work/custom_components:ro`, "-v", `${root}tests/ha_assist_contract.py:/work/ha_assist_contract.py:ro`, "-w", "/work",
     "ghcr.io/home-assistant/home-assistant:2026.10.0b0", "ha_assist_contract.py"], { stdio: "inherit" });
   const [code] = await once(child, "exit");
   process.exitCode = code ?? 1;

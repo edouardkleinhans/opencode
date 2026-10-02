@@ -291,7 +291,8 @@ RUN --mount=type=bind,source=test/v2-ui-lan-fixture.mjs,target=/tmp/v2-ui-lan-fi
     timeout --signal=TERM --kill-after=5s 45s node /tmp/v2-ui-lan-fixture.mjs
 
 # Make scripts executable and create runtime directories
-RUN chmod +x /usr/local/bin/* \
+RUN python3 -c 'import json; from pathlib import Path; p = Path("/opt/opencode-assist/custom_components/opencode_assist"); m = json.loads((p / "manifest.json").read_text()); assert m["domain"] == "opencode_assist" and m["version"]; assert (p / "config_flow.py").is_file()' \
+    && chmod +x /usr/local/bin/* \
     && chmod +x /opt/openchamber/patch-ingress.js \
     && chmod +x /etc/s6-overlay/s6-rc.d/init-opencode/run \
     && chmod +x /etc/s6-overlay/s6-rc.d/ha-opencode/run \
@@ -352,6 +353,7 @@ RUN --mount=type=bind,source=test/v2-boundary-fixture.sh,target=/tmp/v2-boundary
 
 RUN --mount=type=bind,source=test,target=/tmp/ha-assist/test,readonly \
     ln -s / /tmp/ha-assist/rootfs \
+    && PYTHONDONTWRITEBYTECODE=1 python3 /tmp/ha-assist/test/assist-install.test.py \
     && timeout --signal=TERM --kill-after=10s 120s node --test \
         /tmp/ha-assist/test/opencode-v2-assist-adapter.test.js \
         /tmp/ha-assist/test/opencode-v2-assist-service.test.js

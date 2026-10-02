@@ -2,20 +2,39 @@
 
 This is the **beta channel** for the OpenCode add-on. It contains experimental features and fixes that are being validated before inclusion in the stable release.
 
-Beta **3.2.0b0** is based on **stable 3.1.0**, with the same pinned OpenCode `2.0.13`
+Beta **3.2.0b1** is based on **stable 3.1.0**, with the same pinned OpenCode `2.0.13`
 runtime. HA 2026.10 integration includes native LLM API discovery, prompt/context
 forwarding and an experimental native Assist/AI data-task adapter. The roadmap
 is tracked in [#45](https://github.com/magnusoverli/opencode/issues/45).
 
 ### Experimental native Assist and AI data tasks
 
-The 3.2.0b0 beta can act as a model backend for HA through the optional
-[OpenCode Assist companion](../custom_components/opencode_assist/README.md).
-Install that integration separately, restart HA, and enable `ha_assist_enabled`
-in the beta app. Pair through `/ha-assist/` beneath its authenticated Ingress URL,
-then create conversation or AI data-task subentries in HA. API choices come from
+The beta can act as a model backend for HA through the optional
+[OpenCode Assist companion](rootfs/opt/opencode-assist/custom_components/opencode_assist/README.md).
+Beta **3.2.0b1** bundles the matching integration: enable `ha_assist_enabled` and
+restart the app to install it into HA's `custom_components` directory. It is off
+by default. **Restart Home Assistant (Core) after installation or an update**;
+restarting only the app cannot load the new code. A Core restart interrupts HA
+and Assist temporarily; it is never triggered automatically.
+
+Open the app's authenticated Ingress UI and tap **Set up OpenCode Assist** in
+the top bar in either terminal or OpenChamber mode. The link stays within the
+current session, including in the iOS app where the URL is not visible. The
+administrator-only page displays installation/restart guidance and creates a
+one-time-displayed pairing URL/key for HA's **Add integration → OpenCode Assist**
+flow. Enter those values, then create conversation or AI data-task subentries.
+Pairing is still manual. API choices come from
 HA's current registry and default to none; select Assist explicitly for home
 control. This selection is independent of the app's outgoing native-MCP option.
+
+The installer atomically installs or updates only an unmodified app-managed
+copy. A manual installation (including the 3.2.0b0 ZIP) or edited files produce a
+clear conflict in the app log and prevent Assist from starting. Back up and move
+the conflicting directory out of `custom_components` before opting into app
+management, then restart the app and Core. Disabling the option keeps installed
+files and HA configuration. Code is bundled in the image, not downloaded at
+startup; the separate release ZIP contains the same companion sources. For
+**3.2.0b0**, install that ZIP manually and restart HA before pairing.
 
 HA owns the ChatLog, caller context and selected tool execution. The adapter
 streams model text and returns structured calls to HA in isolated disposable
@@ -749,6 +768,50 @@ reserved. Other variables retain separate shell/service handling and generate
 a warning; cloud credential chains and general environment parity remain under
 development. Ordinary provider keys are not isolated from backend subprocesses.
 Do not paste keys into chat. Native `/connect` account setup remains available.
+
+### Lemonade Server (local models)
+
+[Lemonade Server](https://github.com/lemonade-sdk/lemonade) serves an
+OpenAI-compatible API. It does not need a `/connect` sign-in or an API key when
+your server is unauthenticated. In **Custom OpenCode configuration**, use the
+following JSON, replacing the address, model ID, and example model capabilities
+and limits with your server's actual values:
+
+```json
+{
+  "model": "lemonade/your-model-id",
+  "providers": {
+    "lemonade": {
+      "name": "Lemonade Server",
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": { "baseURL": "http://192.0.2.10:13305/v1" },
+      "models": {
+        "your-model-id": {
+          "capabilities": { "tools": true, "input": ["text"], "output": ["text"] },
+          "limit": { "context": 65536, "output": 8192 }
+        }
+      }
+    }
+  }
+}
+```
+
+Find the exact installed model ID at Lemonade's `/v1/models`. The add-on runs
+in a container, so `localhost` in `baseURL` means the add-on, **not** the PC
+running Lemonade. Lemonade defaults to `localhost:13305`; make it reachable on
+a trusted private network and use that host's address (with `/v1`). Do not
+expose an unauthenticated server to the public internet. If you enabled
+authentication, add `"apiKey": "{env:LEMONADE_API_KEY}"` under `settings` and
+set `LEMONADE_API_KEY` privately in the add-on's **Environment variables**;
+otherwise omit both. Do not set `tools: true` unless the selected model
+supports tool calls, and use its real context/output limits rather than the
+illustrative values above.
+
+For smaller local models, consider **MCP tool profile → compact** in the add-on
+options, then restart. It reduces the prompt and limits Home Assistant MCP
+tools to read-only diagnostics; choose `configuration` or `full` if you need
+their additional tools. Set an effective model context window of at least 64K
+to avoid truncating tools and instructions (see [MCP Tool Profiles](#mcp-tool-profiles)).
 
 ### External MCP servers
 

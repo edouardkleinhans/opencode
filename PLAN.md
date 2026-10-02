@@ -1,8 +1,52 @@
 # OpenCode: implementation and release plan
 
-Updated: 2026-10-01. This is the single shared plan for this work, tracked in Git.
+Updated: 2026-10-02. This is the single shared plan for this work, tracked in Git.
 Only open tasks appear as checkboxes; close them with concrete evidence and keep
 the remaining list current instead of accumulating historical plans.
+
+## Assist setup improvements — beta 3.2.0b1 release
+
+- Worktree: `feat/assist-setup`, based on published 3.2.0b0/main `7b92996`.
+- User authorized consolidating all outstanding work on `main`, committing and
+  pushing it, and publishing **3.2.0b1**. Include the previously retained Lemonade
+  guidance and contributor credits; older native-integration edits are already
+  represented by the published b0 implementation.
+- [ ] Pass main CI/native amd64+arm64 checks, publish both final images, then tag
+  `beta-v3.2.0b1` and verify the release, companion ZIP and storefront update.
+- One canonical companion source now lives in
+  `ha_opencode_beta/rootfs/opt/opencode-assist/custom_components/opencode_assist`.
+  The image's normal rootfs copy and the release ZIP both use it; no runtime
+  download is needed. Companion version is `0.1.0b2`.
+- `ha_assist_enabled` stays off by default. When enabled, the supervised worker
+  installs before starting. Atomic directory rename/exchange, per-file ownership
+  hashes and an install lock preserve manual/edited copies and fail closed on
+  conflicts, links or unsupported atomic operations. Disabling leaves files.
+- Installation logs and the pairing UI prompt for a **Home Assistant Core**
+  restart after changes, distinguish it from an app restart, and explain the
+  interruption. No automatic Core restart or automatic pairing is implemented.
+- Both Ingress modes have a touch-sized **Set up OpenCode Assist** link in a
+  reserved top bar. Same-frame navigation preserves the current Ingress session.
+  The existing admin, CSRF, one-time key and revocation boundaries remain.
+- Verification: 269 beta runtime tests passed / 3 environment skips, including
+  8 filesystem installer cases through the Node runner and rendered mobile
+  Chromium navigation/layout checks in both modes. All 6 actual HA 2026.10.0b0
+  companion/transport contracts passed. Stable proxy regression suite: 20 passed
+  when run alone (one IPv6 fixture assertion failed in a concurrent combined-
+  channel run, then passed standalone; stable forwarding is unchanged).
+- Native amd64 boundary image `opencode-beta:assist-setup-local` passed the
+  existing boundary checks, all 8 installer cases and 4 Assist adapter/pairing
+  tests. Image config:
+  `sha256:82e406aab3f903dd4921104d129ba87d0e9ae604f1391e9f5e19be160e44121b`.
+  All 12 companion files inside the image match the generated release ZIP
+  byte-for-byte (ZIP SHA256
+  `b390eca7c2bf30d881f57f2cfd7e5aeb9150b5ae98e45135ed05c56867e1ff79`).
+- WebKit **26.6** / Playwright **1.63.0** also passed iPhone-sized iframe
+  navigation, pairing POST, readable-key layout and return in both proxy modes.
+  Tests use simulated Core metadata and representative app-layout fixtures with
+  the real pairing worker; Chromium checks are wired into PR CI. Screenshots:
+  `/tmp/opencode/assist-setup-artifacts/screenshots/`.
+- [ ] Verify on a physical iOS HA app and supervised HA installation. Browser
+  device emulation is not evidence of the native iOS app or a real HA restart.
 
 ## HA native integration beta — issue #45
 

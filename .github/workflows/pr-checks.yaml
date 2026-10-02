@@ -55,6 +55,8 @@ jobs:
             --moduleResolution bundler --target ES2022 --lib ES2022,DOM "${editor_deps}/editor.ts"
 
       - name: Beta add-on contract tests
+        env:
+          HA_ASSIST_BROWSER_EXECUTABLE: /usr/bin/google-chrome
         run: node --test "ha_opencode_beta/test/*.test.js"
 
       - name: Beta external MCP root boundary

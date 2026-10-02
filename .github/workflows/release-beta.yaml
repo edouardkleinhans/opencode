@@ -52,10 +52,10 @@ jobs:
           # allowed to have moved the beta add-on itself, because this job
           # publishes main's ha_opencode_beta/ as the storefront for an image
           # built from the tag.
-          if ! git diff --quiet "${TAG}" HEAD -- ha_opencode_beta/ custom_components/opencode_assist/ scripts/package-ha-assist.py; then
+          if ! git diff --quiet "${TAG}" HEAD -- ha_opencode_beta/ scripts/package-ha-assist.py; then
             echo "::error::main has moved past ${TAG} inside the beta or its companion sources."
             echo "::error::The published storefront would not match the image built from ${TAG}."
-            git diff --stat "${TAG}" HEAD -- ha_opencode_beta/ custom_components/opencode_assist/ scripts/package-ha-assist.py
+            git diff --stat "${TAG}" HEAD -- ha_opencode_beta/ scripts/package-ha-assist.py
             echo "::error::Either tag main's current tip, or reset main to ${TAG}."
             exit 1
           fi

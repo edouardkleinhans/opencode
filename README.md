@@ -347,6 +347,16 @@ See the [contributors page](https://github.com/magnusoverli/opencode/graphs/cont
 </tr>
 </table>
 
+### More community code contributors
+
+- [@benwestrate](https://github.com/benwestrate) — optional beta LAN server mode ([#31](https://github.com/magnusoverli/opencode/pull/31)).
+- [@Rahulsharma0810](https://github.com/Rahulsharma0810) — OpenChamber LAN access and native-app support ([#47](https://github.com/magnusoverli/opencode/pull/47), [#136](https://github.com/magnusoverli/opencode/pull/136)).
+- [@lchfabbri](https://github.com/lchfabbri) — SSH client support for Git remotes ([#101](https://github.com/magnusoverli/opencode/pull/101)).
+- [@mabratland](https://github.com/mabratland) — secure external MCP configuration ([#131](https://github.com/magnusoverli/opencode/pull/131)).
+- [@anupamme](https://github.com/anupamme) — compatible `brace-expansion` security update ([#145](https://github.com/magnusoverli/opencode/pull/145)).
+
+The [stable](ha_opencode/CHANGELOG.md) and [beta](ha_opencode_beta/CHANGELOG.md) changelogs also credit individual issue reports and suggestions.
+
 ---
 
 ## 📜 License

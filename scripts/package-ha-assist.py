@@ -11,7 +11,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path, help="Destination ZIP path")
     args = parser.parse_args()
-    source = Path(__file__).resolve().parent.parent / "custom_components" / "opencode_assist"
+    source = Path(__file__).resolve().parent.parent / "ha_opencode_beta/rootfs/opt/opencode-assist/custom_components/opencode_assist"
     manifest = json.loads((source / "manifest.json").read_text())
     if manifest["domain"] != "opencode_assist" or not manifest.get("version"):
         raise ValueError("Invalid companion manifest")

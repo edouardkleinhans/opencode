@@ -4,6 +4,7 @@ const net = require("net");
 const zlib = require("zlib");
 const { randomBytes } = require("crypto");
 const { routeHaMcp } = require("./ha-mcp-ingress.js");
+const { injectAssistSetup } = require("./assist-setup-ui.js");
 const { validEditorIngressOrigin } = require("./editor-ingress-origin.js");
 const TERMINAL = process.env.HA_INGRESS_UI === "terminal";
 
@@ -863,7 +864,7 @@ function forwardRequest(req, res, { ingressPath, upstreamPath, body = null, oaut
     const isHtml = contentType.includes("text/html");
     const isJavaScript = /(?:application|text)\/javascript|\bmodule\b/.test(contentType);
     const isCss = contentType.includes("text/css");
-    if (TERMINAL || (!isHtml && !isJavaScript && !isCss)) {
+    if ((TERMINAL && !isHtml) || (!isHtml && !isJavaScript && !isCss)) {
       if (clientClosed || !canWriteResponse(res)) {
         upstreamRes.destroy();
         return;
@@ -882,7 +883,8 @@ function forwardRequest(req, res, { ingressPath, upstreamPath, body = null, oaut
       const decoded = decodeBody(Buffer.concat(chunks), responseHeaders["content-encoding"]);
       const text = decoded.toString("utf8");
       const body = isHtml
-        ? transformHtml(text, ingressPath)
+        ? injectAssistSetup(TERMINAL ? text : transformHtml(text, ingressPath), ingressPath,
+            !ALLOW_ANY_REMOTE && remoteAddress === SUPERVISOR_INGRESS_IP && /^[a-f0-9]{32}$/.test(req.headers["x-remote-user-id"] || ""))
         : isCss
           ? transformCss(text, ingressPath)
           : transformJavaScript(text, ingressPath);

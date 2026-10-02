@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const http = require("node:http");
+const { assistUnavailable } = require("./assist-setup-ui.js");
 
 // This boundary is independent of the UI's loopback/LAN allowlist.
 function routeHaMcp(req, res, { ingressPath, upstreamPath, lan = false }) {
@@ -9,6 +10,12 @@ function routeHaMcp(req, res, { ingressPath, upstreamPath, lan = false }) {
   const directoryPath = assist ? "/run/ha-assist" : "/run/ha-facing-mcp";
   const port = assist ? 8769 : 8767;
   const reject = (status) => {
+    if (assist && status === 503) {
+      res.writeHead(503, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'self'; base-uri 'none'", "x-content-type-options": "nosniff" });
+      res.end(assistUnavailable(ingressPath));
+      return;
+    }
     res.writeHead(status, { "content-type": "text/plain", "cache-control": "no-store" });
     res.end(status === 503 ? "MCP setup unavailable\n" : "Forbidden\n");
   };

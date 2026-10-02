@@ -5,13 +5,14 @@ import { createAssistService, assistJson, AssistError } from "./assist-service.j
 
 const requireValue = (value, status, code) => { if (!value) throw new AssistError(status, code); };
 const escape = (value) => String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
-function page(res, content) {
+function page(res, content, path, installation) {
   res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "referrer-policy": "same-origin",
-    "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; form-action 'self'; frame-ancestors 'self'; base-uri 'none'" });
-  res.end(`<!doctype html><html lang="en"><meta charset="utf-8"><title>OpenCode Assist</title><h1>OpenCode Assist pairing</h1>${content}</html>`);
+    "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'self'; base-uri 'none'" });
+  const installed = installation ? `<p>Bundled companion ${escape(installation.version)} installed at ${escape(installation.installed_at)}.</p>` : "";
+  res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>OpenCode Assist</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:48rem;margin:0 auto;padding:16px max(16px,env(safe-area-inset-right)) 16px max(16px,env(safe-area-inset-left))}button,a{min-height:44px;display:inline-flex;align-items:center}button{font:inherit;margin:4px;padding:8px 12px}code{overflow-wrap:anywhere;-webkit-user-select:text;user-select:text}aside{border:1px solid #888;padding:12px}</style></head><body><a target="_self" href="${escape(path.replace(/ha-assist\/$/, ""))}">Back to OpenCode Beta</a><h1>OpenCode Assist pairing</h1><aside>${installed}<strong>Restart Home Assistant after installing or updating the companion.</strong> Restarting only the app is insufficient. This interrupts HA and Assist while Core restarts. If you have already restarted HA since installation, continue below. HA is never restarted automatically.</aside>${content}</body></html>`);
 }
 export async function startAssistHttp({ client, pairing, ingressSecret, verifyAdmin, hostname,
-  directory = "/homeassistant", coreHost = "0.0.0.0", corePort = 8768, ipcPort = 8769 }) {
+  directory = "/homeassistant", coreHost = "0.0.0.0", corePort = 8768, ipcPort = 8769, installation }) {
   const service = createAssistService({ client, directory, authenticate: (header) => pairing.authenticate(header),
     revokePairing: (owner) => { if (pairing.owner === owner) pairing.revoke(); } });
   const forms = new Map();
@@ -30,12 +31,13 @@ export async function startAssistHttp({ client, pairing, ingressSecret, verifyAd
         requireValue(external.origin === origin && ["http:", "https:"].includes(external.protocol), 403, "invalid_origin");
         requireValue(typeof path === "string" && /^\/api\/hassio_ingress\/[A-Za-z0-9_-]+\/ha-assist\/$/.test(path), 403, "invalid_path");
         requireValue(typeof user === "string" && await verifyAdmin(user), 403, "administrator_required");
+        const show = (content) => page(res, content, path, installation);
         for (const [key, value] of forms) if (value.expires <= Date.now()) forms.delete(key);
         if (req.method === "GET") {
           requireValue(forms.size < 64, 429, "busy");
           const csrf = randomBytes(32).toString("base64url");
           forms.set(csrf, { user, origin, path, expires: Date.now() + 300000 });
-          return page(res, `<p>Pair the optional OpenCode Assist companion integration for HA-owned conversations and AI data tasks. Home Assistant chooses and executes its selected tools. The credential permits model usage, not the OpenCode administrative API. Provider charges may apply.</p><p>Current pairing: ${pairing.owner ? "configured" : "none"}.</p><form method="post" action="${escape(path)}"><input type="hidden" name="csrf" value="${csrf}"><button name="action" value="provision">Create or replace pairing</button> <button name="action" value="revoke">Revoke pairing</button></form>`);
+          return show(`<p>Pair the optional OpenCode Assist companion integration for HA-owned conversations and AI data tasks. Home Assistant chooses and executes its selected tools. The credential permits model usage, not the OpenCode administrative API. Provider charges may apply.</p><p>After the HA restart, add <strong>OpenCode Assist</strong> in Settings → Devices &amp; services. The config flow requires the URL and key you create here; pairing is not automatic.</p><p>Current pairing: ${pairing.owner ? "configured" : "none"}.</p><form method="post" action="${escape(path)}"><input type="hidden" name="csrf" value="${csrf}"><button name="action" value="provision">Create or replace pairing</button> <button name="action" value="revoke">Revoke pairing</button></form>`);
         }
         requireValue(req.headers.origin === origin && req.headers["content-type"]?.split(";")[0] === "application/x-www-form-urlencoded", 403, "invalid_origin");
         const chunks = []; let size = 0;
@@ -51,9 +53,9 @@ export async function startAssistHttp({ client, pairing, ingressSecret, verifyAd
         pairing.revoke();
         if (old) await service.revoke(old);
         forms.clear();
-        if (params.get("action") === "revoke") return page(res, "<p>Pairing revoked. Active requests have been cancelled.</p>");
+        if (params.get("action") === "revoke") return show("<p>Pairing revoked. Active requests have been cancelled.</p>");
         const token = pairing.provision();
-        return page(res, `<p>Use these values in Settings → Devices &amp; services → Add integration → OpenCode Assist. The credential is shown once. The internal HTTP endpoint must not be published on the host.</p><p>URL: <code>http://${escape(hostname)}:${core.address().port}</code></p><p>Pairing key: <code>${escape(token)}</code></p>`);
+        return show(`<p>Use these values in Settings → Devices &amp; services → Add integration → OpenCode Assist. The credential is shown once; copy it before leaving this page. On iOS, touch and hold the URL or key to select and copy it. The internal HTTP endpoint must not be published on the host.</p><p>URL: <code>http://${escape(hostname)}:${core.address().port}</code></p><p>Pairing key: <code>${escape(token)}</code></p>`);
       } finally { inflight--; }
     })().catch((error) => {
       if (!res.headersSent) assistJson(res, error instanceof AssistError ? error.status : 503, { error: error instanceof AssistError ? error.message : "unavailable" });

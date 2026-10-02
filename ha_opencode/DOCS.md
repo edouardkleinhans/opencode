@@ -694,6 +694,50 @@ a warning; cloud credential chains and general environment parity remain under
 development. Ordinary provider keys are not isolated from backend subprocesses.
 Do not paste keys into chat. Native `/connect` account setup remains available.
 
+### Lemonade Server (local models)
+
+[Lemonade Server](https://github.com/lemonade-sdk/lemonade) serves an
+OpenAI-compatible API. It does not need a `/connect` sign-in or an API key when
+your server is unauthenticated. In **Custom OpenCode configuration**, use the
+following JSON, replacing the address, model ID, and example model capabilities
+and limits with your server's actual values:
+
+```json
+{
+  "model": "lemonade/your-model-id",
+  "providers": {
+    "lemonade": {
+      "name": "Lemonade Server",
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": { "baseURL": "http://192.0.2.10:13305/v1" },
+      "models": {
+        "your-model-id": {
+          "capabilities": { "tools": true, "input": ["text"], "output": ["text"] },
+          "limit": { "context": 65536, "output": 8192 }
+        }
+      }
+    }
+  }
+}
+```
+
+Find the exact installed model ID at Lemonade's `/v1/models`. The add-on runs
+in a container, so `localhost` in `baseURL` means the add-on, **not** the PC
+running Lemonade. Lemonade defaults to `localhost:13305`; make it reachable on
+a trusted private network and use that host's address (with `/v1`). Do not
+expose an unauthenticated server to the public internet. If you enabled
+authentication, add `"apiKey": "{env:LEMONADE_API_KEY}"` under `settings` and
+set `LEMONADE_API_KEY` privately in the add-on's **Environment variables**;
+otherwise omit both. Do not set `tools: true` unless the selected model
+supports tool calls, and use its real context/output limits rather than the
+illustrative values above.
+
+For smaller local models, consider **MCP tool profile → compact** in the add-on
+options, then restart. It reduces the prompt and limits Home Assistant MCP
+tools to read-only diagnostics; choose `configuration` or `full` if you need
+their additional tools. Set an effective model context window of at least 64K
+to avoid truncating tools and instructions (see [MCP Tool Profiles](#mcp-tool-profiles)).
+
 ### External MCP servers
 
 Use **External MCP configuration** for additional MCP servers. This is separate

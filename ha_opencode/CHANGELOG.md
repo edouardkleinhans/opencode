@@ -3,6 +3,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Document keyless Lemonade Server setup and compact MCP guidance; thanks @soulafein83 for suggesting it in [#147](https://github.com/magnusoverli/opencode/issues/147).
+- Expand the README's community contributor credits.
+
 - Patch `brace-expansion` (CVE-2026-102276) within each minimatch major's own compatible range instead of a blanket override, since forcing minimatch 9's dependency chain onto brace-expansion 5.x broke its CommonJS interop.
 
 ## 3.1.0

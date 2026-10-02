@@ -15,6 +15,7 @@ on:
       - "ha_opencode_beta/test/openchamber-lan-auth.mjs"
       - "ha_opencode_beta/test/v2-lan-fixture.mjs"
       - "ha_opencode_beta/test/opencode-v2-assist*.test.js"
+      - "ha_opencode_beta/test/assist-install.test.py"
       - "ha_opencode_beta/test/helpers/assist-fixture.mjs"
   push:
     branches:
@@ -31,6 +32,7 @@ on:
       - "ha_opencode_beta/test/openchamber-lan-auth.mjs"
       - "ha_opencode_beta/test/v2-lan-fixture.mjs"
       - "ha_opencode_beta/test/opencode-v2-assist*.test.js"
+      - "ha_opencode_beta/test/assist-install.test.py"
       - "ha_opencode_beta/test/helpers/assist-fixture.mjs"
   workflow_dispatch:
 

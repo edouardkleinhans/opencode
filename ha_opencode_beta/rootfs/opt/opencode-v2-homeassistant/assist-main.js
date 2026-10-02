@@ -22,9 +22,10 @@ async function main() {
   const client = OpenCode.make({ baseUrl: "http://127.0.0.1:4100", headers: { Authorization: `Basic ${Buffer.from(`opencode:${password}`).toString("base64")}` } });
   await client.agent.list();
   const pairing = openAssistPairing("/data/ha-assist");
+  const installation = JSON.parse(readFileSync("/run/ha-assist-install.json", "utf8"));
   const lock = await acquireStateLock("/data/ha-assist");
   try {
-    const service = await startAssistHttp({ client, pairing, hostname,
+    const service = await startAssistHttp({ client, pairing, hostname, installation,
       ingressSecret: createIngressSecret("/run/ha-assist/ingress-secret"), verifyAdmin: (user) => verifyAdministrator(token, user) });
     const close = async () => { await service.close(); await lock.close(); process.exit(0); };
     process.once("SIGTERM", close); process.once("SIGINT", close);

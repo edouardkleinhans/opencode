@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## 3.2.0b1
+
+- Bundle and atomically install the optional Assist companion when enabled, preserve manual/edited copies, and add mobile-friendly setup links and Home Assistant restart guidance in both Ingress modes.
+- To enable: turn on `ha_assist_enabled`, restart the app, then restart **Home Assistant Core** to load the companion. Tap **Set up OpenCode Assist** and enter the displayed URL/key in HA's Add Integration flow. Core restart and pairing remain manual; the option is off by default.
+- Upgrading from a manual companion installation (including the b0 ZIP): the installer preserves it and reports a conflict. Back up and move that integration directory out of `custom_components` before opting into app-managed installation. Disabling Assist leaves installed files and HA configuration intact.
+- Include the matching companion **0.1.0b2** in the image and release ZIP, with installation, pairing security and mobile Chromium/WebKit coverage. Physical iOS-app and full supervised HA acceptance remain pending; native Assist stays experimental ([#45](https://github.com/magnusoverli/opencode/issues/45)).
+- Document keyless Lemonade Server setup and compact MCP guidance; thanks @soulafein83 for suggesting it in [#147](https://github.com/magnusoverli/opencode/issues/147).
+- Expand the README's community contributor credits.
+
 ## 3.2.0b0
 
 - First experimental HA native-integration beta, based on stable 3.1.0 with OpenCode 2.0.13 and the existing OpenChamber pin.

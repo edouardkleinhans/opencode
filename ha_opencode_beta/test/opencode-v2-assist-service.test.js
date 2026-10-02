@@ -78,6 +78,7 @@ test("administrator pairing checks CSRF and revocation cancels a pending HA call
   let http;
   try {
     http = await startAssistHttp({ client: fixture.client, directory: fixture.directory, pairing: openAssistPairing(directory),
+      installation: { version: "0.1.0b2", installed_at: "2026-10-02T10:00:00Z" },
       ingressSecret: "fixture-ipc", hostname: "fixture", coreHost: "127.0.0.1", corePort: 0, ipcPort: 0, verifyAdmin: async (user) => user === "admin" });
     const ipc = `http://127.0.0.1:${http.ipc.address().port}/ha-assist/`;
     const base = `http://127.0.0.1:${http.core.address().port}`;
@@ -86,6 +87,12 @@ test("administrator pairing checks CSRF and revocation cancels a pending HA call
     assert.equal((await fetch(ipc)).status, 403);
     assert.equal((await fetch(ipc, { headers: { ...headers, "x-ha-mcp-user-id": "ordinary" } })).status, 403);
     const form = await (await fetch(ipc, { headers })).text();
+    assert.match(form, /Bundled companion 0\.1\.0b2 installed/);
+    assert.match(form, /Restart Home Assistant after installing or updating/);
+    assert.match(form, /HA is never restarted automatically/);
+    assert.match(form, /target="_self" href="\/api\/hassio_ingress\/fixture\/"/);
+    assert.match(form, /name="viewport"/);
+    assert.doesNotMatch(form, /Pairing key: <code>/);
     const csrf = /name="csrf" value="([A-Za-z0-9_-]+)"/.exec(form)[1];
     const post = { ...headers, "content-type": "application/x-www-form-urlencoded", origin: "https://ha.example" };
     assert.equal((await fetch(ipc, { method: "POST", headers: { ...post, origin: "https://wrong.example" }, body: new URLSearchParams({ csrf, action: "provision" }) })).status, 403);
@@ -103,6 +110,7 @@ test("administrator pairing checks CSRF and revocation cancels a pending HA call
       const { value, done } = await reader.read(); assert.equal(done, false); received += Buffer.from(value).toString();
     }
     const revokePage = await (await fetch(ipc, { headers })).text();
+    assert.ok(!revokePage.includes(key), "the key is only displayed by the provisioning response");
     const revokeCsrf = /name="csrf" value="([A-Za-z0-9_-]+)"/.exec(revokePage)[1];
     assert.equal((await fetch(ipc, { method: "POST", headers: post, body: new URLSearchParams({ csrf: revokeCsrf, action: "revoke" }) })).status, 200);
     while (!(await reader.read()).done) { /* drain cancellation event */ }

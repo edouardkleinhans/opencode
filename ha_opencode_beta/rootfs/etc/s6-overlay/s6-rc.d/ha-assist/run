@@ -4,6 +4,11 @@ umask 077
 if [ "$(bashio::config 'ha_assist_enabled' 2>/dev/null || echo false)" != "true" ]; then
     exec sleep infinity
 fi
+# A conflict must only stop Assist, never copy over a manual integration or loop
+# noisily under s6. The log explains recovery; restart the app after resolving it.
+if ! python3 /opt/opencode-assist/install.py; then
+    exec sleep infinity
+fi
 # Pairing/backend credentials remain in this root-owned worker, not agent shells.
 exec /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/data \
     SUPERVISOR_TOKEN="${SUPERVISOR_TOKEN:-}" \
