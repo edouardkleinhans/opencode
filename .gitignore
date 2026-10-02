@@ -24,11 +24,21 @@ npm-debug.log*
 __pycache__/
 *.pyc
 
-# Local maintainer guidance and implementation plans
+# Local maintainer guidance, implementation plans and handoff documents
 /AGENTS.md
 /RELEASING.md
+/PLAN.md
 /*_PLAN.md
+/*_WORK_ORDER.md
+/HANDOVER*.md
+/*_HANDOVER*.md
+/HANDOFF*.md
+/*_HANDOFF*.md
 /plans/
+/handover/
+/handoffs/
+/work-orders/
+/internal/
 /docs/internal/
 
 # Component implementation docs and manual acceptance notes

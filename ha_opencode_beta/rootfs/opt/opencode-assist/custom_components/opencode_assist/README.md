@@ -97,5 +97,6 @@ history fails explicitly instead of being silently compacted outside HA.
 
 Diagnostics contain protocol/capability flags and selected-API counts only.
 Full supervised HA installation, pairing/setup and voice-pipeline acceptance
-remain experimental follow-up work; see the repository `PLAN.md` for tested
+remain experimental follow-up work; see
+[issue #45](https://github.com/magnusoverli/opencode/issues/45) for verification
 evidence and remaining qualification.

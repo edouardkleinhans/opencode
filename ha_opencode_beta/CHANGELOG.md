@@ -8,6 +8,7 @@
 - Add structured CLI arguments and compact command/guide discovery; reduce the root schema response from 7.73 MB to 4.77 KB.
 - Preserve complete large results up to the bounded process limit, report CLI failures accurately, and identify timed-out operations as unverified before retrying.
 - Correct command examples and improve guidance for targeted reads, precise dashboard edits and read-back verification.
+- Remove internal planning and handover documents from the repository.
 
 ## 3.2.0b7
 
