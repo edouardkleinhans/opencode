@@ -6,10 +6,27 @@ the remaining list current instead of accumulating historical plans.
 
 ## Assist fixes and Supervisor-native onboarding — beta 3.2.0b2
 
-- User authorized committing/pushing the completed changes and releasing
-  **3.2.0b2**. Release preparation is in progress: publish and qualify amd64/arm64
-  images before pushing `beta-v3.2.0b2`; the release workflow then advances the
-  storefront from b1 to b2. OpenCode remains pinned to **2.0.13**.
+- Published [beta 3.2.0b2](https://github.com/magnusoverli/opencode/releases/tag/beta-v3.2.0b2)
+  at `f3ac6fb96d3a742738b48334db801926954fdadf`, with the user's approval to commit,
+  push and release. OpenCode remains pinned to **2.0.13**.
+- Main CI `36982830553`, native amd64/ARM64 checks `36982830549`, and pre-tag image
+  publication `36982902946` passed. Images were available before the tag was pushed.
+  Release workflow `36983464750` passed; storefront commit `3357ea6` advertises b2.
+- Tag-build `36983464657` passed both native boundaries, image publication and
+  upload of all image assets. The released `image-manifest.txt` matches the final
+  registry index:
+  `sha256:e4b061e6c39874da2a559ce9dbbcb7971490262b302b5222642b3eb9a61ed2f4`.
+  Platform manifests: amd64
+  `sha256:3b58e834479cd8cf46114600a0bfa1f7bfbdcf16395397dc3fb34bfb848c4247`;
+  ARM64 `sha256:06aa64446da0efc8928418ad045bed451e5b10fe87de1666417eaabc711cbe05`.
+  Pulled the final amd64 image by digest: version/architecture labels are correct,
+  OpenCode is 2.0.13, and all **13 companion files** match the release ZIP byte-for-byte.
+- The downloaded release companion matches all **13 source files** and the final
+  candidate package: version **0.1.0b3**, SHA256
+  `91b954443f3be2b8b08e533c043e1f0ea98a0c8999eb9f675ff2d37b84d94dfd`.
+  Artifacts are under `/tmp/opencode/ha-release-artifacts-3.2.0b2/published/`.
+- Posted the release update to [#45](https://github.com/magnusoverli/opencode/issues/45#issuecomment-5948135598);
+  the broader native-integration roadmap remains open.
 
 - User-reported shutdown failure: the shared state-lock helper returns an unlock
   function, not an object with `.close()`. The worker now releases it on shutdown
@@ -30,8 +47,7 @@ the remaining list current instead of accumulating historical plans.
   `sha256:9b46758048d67bba7b91f0e2b89fce24204259c1b6ed2204c5c8b8acc978c50b`.
   All **6 actual HA 2026.10.0b0 contracts** also passed using the facade's
   production-default workspace selection, including tool execution and follow-up.
-- Published beta remains 3.2.0b1 until b2 artifacts are ready. Supervised HA/iOS
-  acceptance and remote ARM qualification are pending at release preparation.
+- Supervised HA/voice-pipeline and physical iOS acceptance remain pending.
 
 ### Supervisor-only onboarding
 
@@ -84,8 +100,8 @@ the remaining list current instead of accumulating historical plans.
 - Companion ZIP generated at `/tmp/opencode/assist-supervisor/opencode-assist.zip`
   (version 0.1.0b3, SHA256
   `c864de099deff46046a66e8c6cb206798fa06dccabcc589b102967adbfd190c7`).
-- Full supervised HA/voice-pipeline and physical iOS acceptance remain pending.
-  Native ARM and remote CI qualification will be recorded with b2 release evidence.
+- Full supervised HA/voice-pipeline and physical iOS acceptance remain pending;
+  native ARM and remote CI qualification passed for this release.
 - Sources checked 2026-10-02: [app communication](https://developers.home-assistant.io/docs/apps/communication/),
   [Supervisor discovery API](https://developers.home-assistant.io/docs/api/supervisor/endpoints/#discovery),
   [config flows and chaining](https://developers.home-assistant.io/docs/config_entries_config_flow_handler/),
