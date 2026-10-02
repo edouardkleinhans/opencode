@@ -46,14 +46,36 @@ the remaining list current instead of accumulating historical plans.
 - Local startup/migration, native MCP/Assist, Ingress, Usage, model selection,
   editor contracts and process lifecycle checks passed. Full supervised HA/voice
   hardware and physical iOS acceptance remain outside this fixture evidence.
-- [ ] Pass local contracts and native AMD64/ARM64 CI; publish images before
-  tagging **beta-v3.2.0b6**, then verify release assets and final images.
+- Published [beta 3.2.0b6](https://github.com/magnusoverli/opencode/releases/tag/beta-v3.2.0b6)
+  from `0c2d260221a611b225ff2568bb7004eca6cd8020`. Storefront commit `51bb25c`
+  advertises b6; release workflow `37002407727` passed.
+- Main CI `37001445599` passed: **299 beta tests / 2 environment skips**,
+  **21 actual HA contracts**, and **19 shared MCP discovery tests**. Native
+  checks `37001445598` passed on both AMD64 and ARM64, including rendered
+  desktop/mobile Ingress, UI prompt streaming and restart retention on each.
+- Pre-tag publication `37001451374` passed and both images were available
+  before tagging. The downloaded release ZIP is byte-identical to the candidate
+  and all **15 tagged companion files**, including the reused icon/logo.
+- Final tag-build `37002407620` passed on AMD64 and ARM64. The downloaded
+  `image-manifest.txt` matches registry index
+  `sha256:29138763709245e6f63706b936f9464a3d174d7b03d8b8a0c9d5346d974799d7`.
+  Pulled the final AMD64 image by digest and verified actual CLI **2.0.22**,
+  plugin **2.0.22**, OpenChamber web **2.1.0**, and all **15 companion files**
+  byte-for-byte against the published ZIP.
+- Release evidence and the still-open Add-button requirement are recorded in
+  [#45](https://github.com/magnusoverli/opencode/issues/45#issuecomment-5951767442).
 
 ## One of each Assist entity — beta 3.2.0b5
 
 - User requested one conversation agent and one AI data task per app connection,
   with only unconfigured types shown as Add actions. The labels themselves were
   shipped in beta 3.2.0b4 / companion 0.1.0b5 and require a Core restart to load.
+- [ ] Hide the Add action for each configured type while preserving Configure,
+  independent settings and removal/re-addition. **Not delivered in b5 or b6**:
+  duplicate prevention alone does not meet this UI requirement. The user's
+  companion **0.1.0b7** screenshot confirms both buttons remain visible. Blocked
+  on HA exposing add availability independently from supported flow handlers;
+  a restart or browser refresh cannot fix the current implementation.
 - Pinned HA Core 2026.10.0b0 and frontend 20260930.0 use the same
   `supported_subentry_types` map for Add buttons, Configure visibility and flow
   handler lookup. There is no separate add-availability flag. Filtering out a
