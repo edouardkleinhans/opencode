@@ -7,6 +7,10 @@ const key = "opencodeUpdate.toast.available.manualDescription";
 // Exact upstream values make drift visible when changing the preview revision.
 // Every locale overrides this key, so an English-only patch is insufficient.
 const messages = {
+  nl: [
+    "Versie {version} beschikbaar. Werk OpenCode bij op de manier waarop u het hebt geïnstalleerd en herstart daarna OpenChamber.",
+    "OpenCode {version} is beschikbaar bij het upstream-project. Home Assistant Supervisor beheert de versies van OpenCode en OpenChamber in deze app. Controleer de app-pagina in Home Assistant op updates; deze upstream-release betekent niet dat er een app-update beschikbaar is.",
+  ],
   en: [
     "Version {version} available. Update OpenCode the way you installed it, then restart OpenChamber.",
     "OpenCode {version} is available upstream. Home Assistant Supervisor manages this app's OpenCode and OpenChamber versions. Check the app's page in Home Assistant for updates; this upstream release does not mean an app update is available.",

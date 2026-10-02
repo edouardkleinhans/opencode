@@ -101,7 +101,7 @@ test("pinned V2 consumes HA prompts and live context, lists resources and enforc
       try { await client.server.info({ signal: AbortSignal.timeout(500) }); ready = true; break; } catch { await sleep(50); }
     }
     assert.ok(ready, "isolated pinned server readiness");
-    assert.equal((await client.server.info()).version, "2.0.13");
+    assert.equal((await client.server.info()).version, "2.0.22");
     let session = await client.session.create({ title: "warmup fixture" });
     await client.session.prompt({ sessionID: session.id, text: "Reply briefly without using tools." });
     await client.session.wait({ sessionID: session.id }, { signal: AbortSignal.timeout(10000) });

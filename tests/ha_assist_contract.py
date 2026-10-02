@@ -473,6 +473,28 @@ class OnboardingContracts(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("next_flow", result)
         self.assertEqual(len(self.hass.config_entries.async_entries("opencode_assist")), 1)
 
+    async def test_ha_serves_bundled_brand_images_with_dark_and_hidpi_fallbacks(self):
+        from collections import deque
+        from aiohttp.test_utils import make_mocked_request
+        from homeassistant.components.brands import BrandsIntegrationView
+        from homeassistant.components.http import KEY_AUTHENTICATED
+
+        loader.async_setup(self.hass)
+        integration = await loader.async_get_integration(self.hass, "opencode_assist")
+        self.assertTrue(integration.has_branding)
+        self.hass.data["brands"] = deque()
+        view = BrandsIntegrationView(self.hass)
+        brand = Path(integration.file_path) / "brand"
+        with patch.object(view, "_get_image_data", side_effect=AssertionError("Local branding must not fetch the CDN")):
+            for kind in ("icon", "logo"):
+                for variant in (kind, f"dark_{kind}", f"{kind}@2x", f"dark_{kind}@2x"):
+                    request = make_mocked_request("GET", f"/api/brands/integration/opencode_assist/{variant}.png")
+                    request[KEY_AUTHENTICATED] = True
+                    response = await view.get(request, "opencode_assist", f"{variant}.png")
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(response.content_type, "image/png")
+                    self.assertEqual(response.body, (brand / f"{kind}.png").read_bytes())
+
     async def test_refresh_after_expiry_empty_models_and_lost_pairing_response(self):
         menu = await self.start()
         form = await self.hass.config_entries.flow.async_configure(menu["flow_id"], {"next_step_id": "conversation"})

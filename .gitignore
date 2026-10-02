@@ -21,6 +21,8 @@ npm-debug.log*
 
 # Build artifacts
 *.tgz
+__pycache__/
+*.pyc
 
 # Local maintainer guidance and implementation plans
 /AGENTS.md

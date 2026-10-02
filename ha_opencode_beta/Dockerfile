@@ -6,11 +6,11 @@ ARG NODE_VERSION=24.15.0
 # Bashio runtime as the final base, and copy an exact official Node toolchain in.
 FROM node:${NODE_VERSION}-trixie-slim AS node-runtime
 
-# OpenChamber's web preview is independently pinned; its desktop CLI is never
+# OpenChamber's web release is independently pinned; its desktop CLI is never
 # installed. Build against the upstream lock, on the target's native CI runner.
 FROM oven/bun:1.4.2-slim@sha256:cb3bbbb08e13a4a2ff400f24c7a2a1d5efa83f6ef8544d52d95a519631e2fc61 AS openchamber-bun
 FROM node-runtime AS openchamber-builder
-ARG OPENCHAMBER_REVISION=9fba129ddf968df1e5fb6916b84d3ceb35493198
+ARG OPENCHAMBER_REVISION=90726f9949da3408b2baf0f997e24bd71455946e
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git python3 g++ make \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=openchamber-bun /usr/local/bin/bun /usr/local/bin/bun
@@ -80,8 +80,8 @@ ARG NODE_VERSION
 ARG ADDON_CHANNEL=stable
 ARG TTYD_VERSION=1.7.7
 # One pinned V2 runtime and its matching plugin API. No V1 runtime is installed.
-ARG OPENCODE_V2_VERSION=2.0.13
-ARG OPENCHAMBER_VERSION=2.0.0-preview.8
+ARG OPENCODE_V2_VERSION=2.0.22
+ARG OPENCHAMBER_VERSION=2.1.0
 ARG PPQ_PROXY_VERSION=0.1.0
 ARG TSX_VERSION=4.20.6
 ARG YQ_VERSION=v4.53.3
@@ -281,7 +281,8 @@ COPY --from=openchamber-builder /opt/openchamber-preview/node_modules /opt/openc
 COPY --from=openchamber-builder /opt/openchamber-preview/packages/web /opt/openchamber-preview/packages/web
 COPY --from=openchamber-builder /opt/openchamber-preview/packages/sdk /opt/openchamber-preview/packages/sdk
 COPY --from=openchamber-builder /opt/openchamber-preview/LICENSE /opt/openchamber-preview/LICENSE
-RUN printf '%s\n' "${OPENCHAMBER_VERSION}" > /usr/local/share/openchamber-certified-version
+RUN test "$(node -p 'require("/opt/openchamber-preview/packages/web/package.json").version')" = "${OPENCHAMBER_VERSION}" \
+    && printf '%s\n' "${OPENCHAMBER_VERSION}" > /usr/local/share/openchamber-certified-version
 
 # Copy root filesystem (server code, scripts, etc.)
 COPY rootfs /
@@ -340,6 +341,9 @@ RUN set -e; \
 # injection on both supported architectures. It is not part of ordinary local image builds;
 # the Supervisor devcontainer separately covers the shipped s6 service graph.
 FROM runtime AS boundary-test
+RUN --network=none --mount=type=bind,source=test/v2-openchamber-browser.mjs,target=/tmp/v2-openchamber-browser.mjs,readonly \
+    timeout --signal=TERM --kill-after=10s 180s node /tmp/v2-openchamber-browser.mjs
+
 RUN --mount=type=bind,source=test/v2-boundary-fixture.sh,target=/tmp/v2-boundary-fixture.sh,readonly \
     --mount=type=bind,source=test/v2-caller-secret-plugin.js,target=/tmp/v2-caller-secret-plugin.js,readonly \
     --mount=type=bind,source=test/v2-caller-secret-native.py,target=/tmp/v2-caller-secret-native.py,readonly \

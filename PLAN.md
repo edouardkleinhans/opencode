@@ -4,6 +4,51 @@ Updated: 2026-10-02. This is the single shared plan for this work, tracked in Gi
 Only open tasks appear as checkboxes; close them with concrete evidence and keep
 the remaining list current instead of accumulating historical plans.
 
+## Runtime refresh — beta 3.2.0b6
+
+- User requested the latest OpenCode and OpenChamber pins, application-level
+  verification, then release **3.2.0b6**.
+- Additional requests: remove the redundant Ingress Assist setup header (both
+  modes), clarify speech engines are separate, and reuse add-on branding in the
+  HA integration. Companion **0.1.0b7** adds local `brand/icon.png` and `logo.png`;
+  release packaging includes the same PNG bytes as the add-on artwork.
+- Latest published versions checked 2026-10-02: OpenCode CLI/plugin **2.0.22**
+  (npm latest) and OpenChamber **2.1.0**, immutable release commit
+  `90726f9949da3408b2baf0f997e24bd71455946e`.
+- Updated exact UI patch anchors for the expanded editor, credential precedence
+  and Dutch update notice. OpenChamber now uses the running backend's credential
+  API; removed the obsolete direct-database/legacy-auth patch.
+- Local runtime suite after header removal: **289 passed / 3 environment skips**; fresh migration and
+  both old-beta and **2.0.13 → 2.0.22** copy-on-write upgrades pass, including
+  failure preservation, record/permission validation and rejected downgrades.
+  All **21 actual HA 2026.10 contracts** passed against OpenCode 2.0.22,
+  including authenticated local icon/logo serving and dark/high-DPI fallbacks.
+- Initial native amd64 boundary image built successfully with actual upstream
+  model-selection, API-backed Usage, chunked POST, LAN auth, forward migration,
+  process isolation and Assist tests. The final local amd64 boundary image also
+  passed the browser fixture, **10 installer tests** and **23 Assist tests**.
+- Rendered image-level acceptance passed with network disabled: actual
+  OpenChamber 2.1.0 frontend, managed UI launcher, shipped Ingress proxy and
+  OpenCode 2.0.22 backend. Selected the fixture project, sent a UI prompt and saw
+  its streamed response, read API-backed credentials, stopped only the UI,
+  restarted both processes and verified history/sign-in retention, then opened
+  the mobile composer. No script errors, escaped Ingress paths or service worker.
+  The fixture now runs in native image CI on both architectures.
+- User supplied a screenshot after fresh onboarding showing companion 0.1.0b6
+  and both Add buttons. Reconfirmed against HA Core 2026.10.0b0 and frontend
+  20260930.0: integration-page lines 286–293 enumerate supported types for Add;
+  `ha-config-sub-entry-row.ts:83` uses the same map for Configure; Core
+  `config_entries.py:3833` uses it to find both flow handlers. No independent
+  add-availability field exists. This remains an explicit upstream UI limitation.
+- Companion ZIP `/tmp/opencode/ha-release-artifacts-3.2.0b6/opencode-assist.zip`
+  contains **15 files**, all byte-identical to source including both add-on PNGs.
+  SHA256 `b8e5f336ea3f10b6961e412d6c6d0157325b459c6520d01b8c60a750e8769f31`.
+- Local startup/migration, native MCP/Assist, Ingress, Usage, model selection,
+  editor contracts and process lifecycle checks passed. Full supervised HA/voice
+  hardware and physical iOS acceptance remain outside this fixture evidence.
+- [ ] Pass local contracts and native AMD64/ARM64 CI; publish images before
+  tagging **beta-v3.2.0b6**, then verify release assets and final images.
+
 ## One of each Assist entity — beta 3.2.0b5
 
 - User requested one conversation agent and one AI data task per app connection,

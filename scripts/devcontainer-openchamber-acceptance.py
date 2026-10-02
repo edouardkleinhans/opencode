@@ -66,7 +66,7 @@ def ready():
         result = subprocess.run(["docker", "exec", APP, "curl", "-fsS", "--max-time", "2", "http://127.0.0.1:3010/api/info"], capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
             try:
-                if json.loads(result.stdout).get("version") == "2.0.13":
+                if json.loads(result.stdout).get("version") == "2.0.22":
                     return
             except (ValueError, AttributeError):
                 pass

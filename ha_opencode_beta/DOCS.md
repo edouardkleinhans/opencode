@@ -2,8 +2,8 @@
 
 This is the **beta channel** for the OpenCode add-on. It contains experimental features and fixes that are being validated before inclusion in the stable release.
 
-Beta **3.2.0b5** is based on **stable 3.1.0**, with the same pinned OpenCode `2.0.13`
-runtime. HA 2026.10 integration includes native LLM API discovery, prompt/context
+Beta **3.2.0b6** is based on **stable 3.1.0**, with pinned OpenCode `2.0.22`
+and OpenChamber `2.1.0`. HA 2026.10 integration includes native LLM API discovery, prompt/context
 forwarding and an experimental native Assist/AI data-task adapter. The roadmap
 is tracked in [#45](https://github.com/magnusoverli/opencode/issues/45).
 
@@ -25,15 +25,17 @@ instructions. The app retries delivery if HA is unavailable and avoids repeating
 delivered notices on app restarts. HA clears the notification on Core restart;
 dismiss a delayed reminder if you already restarted after its installation time.
 
-Open the app's authenticated Ingress UI and tap **Set up OpenCode Assist** in
-the top bar in either terminal or OpenChamber mode. The link stays within the
-current session, including in the iOS app where the URL is not visible. The
-administrator-only page displays installation/restart guidance and links to HA
-setup. After restarting Core, open **Settings → Devices & services** and configure
+After restarting Core, open **Settings → Devices & services** and configure
 the discovered **OpenCode Assist** app. Choose whether to create a conversation
 agent or AI data task and confirm the connection; HA then opens model/API selection
 automatically. **No URL or key needs copying.** Starting from **Add integration →
 OpenCode Assist** uses the same Supervisor discovery flow.
+
+**3.2.0b6** removes the redundant Assist setup header from both Ingress interfaces.
+Use Home Assistant's discovered integration or **Add integration** for setup.
+Companion **0.1.0b7** also includes the add-on icon and logo, served locally by HA.
+Restart **Home Assistant Core** after the app updates the companion, then refresh
+the integration page to load the branding.
 
 API choices come from HA's current registry and default to none; select Assist
 explicitly for home control. Select the resulting conversation entity in your
@@ -43,6 +45,16 @@ add-entity buttons (also in the existing app connection's overflow menu). Both
 share the current pairing, with independent model settings. Starting **Add
 integration** again attempts a second app connection. This is independent of the
 app's outgoing native-MCP option.
+
+**Voice needs separate speech engines.** OpenCode supplies the conversation
+agent, not speech-to-text or text-to-speech. Empty speech selectors mean HA has
+no suitable speech engines configured. Use Home Assistant Cloud, or install and
+start **Whisper** and **Piper**, then add their discovered **Wyoming Protocol**
+integrations in **Settings → Devices & services**. Select them alongside the
+OpenCode conversation agent in **Settings → Voice assistants**. Whisper supports
+open-ended conversations; Speech-to-Phrase is intended for a limited set of home
+control commands. Assist text chat works without speech engines. See
+[HA's local voice setup](https://www.home-assistant.io/voice_control/voice_remote_local_assistant/).
 
 **3.2.0b4:** the integration page now labels these buttons **Add
 conversation agent** and **Add AI data task**; 3.2.0b3 omitted their translation
@@ -90,7 +102,7 @@ Text and schema-validated JSON tasks are supported; images and attachments are
 not advertised. Internal ports 8768/8769 must remain unpublished. The companion
 README covers provider usage, pairing replacement, removal and data handling.
 
-Contract tests use OpenCode 2.0.13 and actual HA 2026.10.0b0 ChatLog/config-flow
+Contract tests use OpenCode 2.0.22 and actual HA 2026.10.0b0 ChatLog/config-flow
 classes in the official HA image. Full supervised installation and Assist-pipeline
 acceptance remain pending, as does crash-recovery retention qualification. A
 worker/runtime crash can leave a temporary session behind.
@@ -119,7 +131,7 @@ at `/usr/share/doc/ha-opencode/NOTICE` and in this repository's
 - **Stable 3.1.0 baseline**: Includes stable's complete large-HAB-output exports, runtime-aware template validation, 32 GiB history-migration preflight and startup progress messages.
 - **Native LLM API discovery**: `get_agent_capabilities` and `ha://agent/capabilities` query `llm/api/list` on each check, show registered IDs/names, and diagnose the configured selection without changing it. The development guide targets HA `2026.10.0b0`.
 - **OpenChamber session creation fix**: Beta `3.0.0b19` fixes HTTP 400 errors when creating sessions or sending JSON requests through Home Assistant Ingress. A first message and free-model reply have been verified through the actual browser UI and Core Ingress.
-- **Official V2 runtime**: Beta `3.0.0b16` pins the CLI and plugin to OpenCode `2.0.13` using the official `@opencode` packages.
+- **Official V2 runtime**: Beta `3.2.0b6` pins the CLI and plugin to OpenCode `2.0.22` using the official `@opencode` packages.
 - **Forward state upgrades**: Earlier V2 data upgrades through a validated private copy, preserving conversations, sign-ins and permissions. Successful upgrades remove obsolete generations; failed conversion preserves its input and reports an error. There is no application runtime fallback or rollback selector.
 - **V2-only runtime**: Beta `3.0.0b18` runs one pinned OpenCode V2 server. V1 and the runtime selector have been removed. The server runs as root for Home Assistant filesystem compatibility; its attached terminal runs as UID `60001`.
 - **Managed CLI**: `opencode` and `opencode2` address the same V2 server. `opencode status`, `opencode service status`, and `opencode api GET /api/info` inspect the existing server without starting another daemon.
@@ -130,7 +142,7 @@ at `/usr/share/doc/ha-opencode/NOTICE` and in this repository's
 - **ESPHome 2026.8 support**: Device Builder migrations can be previewed as validated, hash-guarded candidates; structured DNS/mDNS/ICMP troubleshooting and bounded crash decoding are available; naturally completed log and job streams now finish immediately.
 - **Startup hooks**: Your own `.sh` scripts, kept in your configuration directory, run once every time the add-on starts — the supported way to add a bridge or a small service without editing files inside the container, which never survives a restart. Off by default. See [Startup Hooks (Beta)](#startup-hooks-beta).
 - **Home context**: Sessions now start knowing your installation. A generated **Install briefing** describes your setup (version, areas, entity counts, configuration layout, integrations), **decision notes** carry lasting decisions between sessions once you approve them, and `AGENTS.local.md` holds your own instructions where add-on updates cannot overwrite them. Both options default on and switch off independently. See [Home Context (Beta)](#home-context-beta).
-- **OpenChamber V2 preview**: The web interface is built from pinned preview `2.0.0-preview.8` source and its dependency lock. It attaches to the same app-owned V2 backend as the terminal, with independently supervised UI lifecycle and Ingress-adapted assets.
+- **OpenChamber V2**: The web interface is built from pinned release `2.1.0` source and its dependency lock. It attaches to the same app-owned V2 backend as the terminal, with independently supervised UI lifecycle and Ingress-adapted assets.
 - **Native Home Assistant MCP bridge**: Optional bridge from OpenCode to Home Assistant Core's native LLM MCP endpoint (`/api/mcp/<API ID>`, default `assist`) for testing the new native LLM/MCP platform when the running Home Assistant version supports it.
 - **Compact Home Assistant context**: New `get_home_context` MCP tool gives agents focused area/domain/entity context with area and device metadata instead of broad state dumps.
 - **Native LLM provider development guide**: New `get_ha_llm_development_guide` MCP tool helps custom integration authors build `<integration>/llm.py` tool providers aligned with Home Assistant's upstream architecture.
@@ -512,7 +524,7 @@ native tools. The bridge preserves supplied request metadata but does not invent
 a room/device identity. Native errors should be reported rather than retried
 through broader administrative tools.
 
-Local qualification uses the pinned OpenCode `2.0.13` process, the app's MCP
+Local qualification uses the pinned OpenCode `2.0.22` process, the app's MCP
 registration/forwarding code, and controlled HA/provider fixtures. It covers
 prompt consumption, resource discovery, fresh native context calls, required
 argument validation and read-only policy. Resource reads/cancellation also have
@@ -535,15 +547,15 @@ file before a whole-config dashboard write; never reconstruct from the preview.
 Files older than 24 hours are pruned on subsequent exports, and container restart
 clears them.
 
-OpenChamber is built from preview `2.0.0-preview.8`, source commit
-`9fba129ddf968df1e5fb6916b84d3ceb35493198`. Its web package reports upstream
-version `1.24.2`; the immutable source identifies this V2 preview. Its client
+OpenChamber is built from release `2.1.0`, source commit
+`90726f9949da3408b2baf0f997e24bd71455946e`. Its web package reports upstream
+version `2.1.0`; the immutable source identifies this release. Its client
 dependencies are independent of the app's backend pin.
 
 The UI binds to `127.0.0.1:3010` behind the app's Ingress proxy. Its backend
 credential stays in process memory, and it receives no Supervisor token. Stopping
 the UI leaves the V2 backend running. Updates arrive through app images; the
-preview cannot start or upgrade a separate backend. There is no V1 runtime selector.
+web interface cannot start or upgrade a separate backend. There is no V1 runtime selector.
 
 Browser startup, shared history/policy and independent UI stop/start have passed
 amd64 devcontainer acceptance. Full streaming/reconnect, provider/OAuth, UI editing
@@ -551,8 +563,9 @@ and ARM/HAOS qualification remain pending.
 
 ### Connecting a provider with browser sign-in
 
-Starting with `3.0.0b22`, OpenChamber's **Usage** panel reads the same active V2
-credential database as the managed backend, rather than retained V1 sign-ins.
+Starting with `3.2.0b6`, OpenChamber's **Usage** panel reads the active provider
+credentials through the managed OpenCode API, rather than reading its database
+directly. Retained V1 sign-ins are never used.
 OpenCode owns OAuth refresh. If Usage reports expired authorization after an idle
 period, send a chat message and refresh Usage; reconnect OpenAI if chat also fails.
 This warning concerns provider quota access, not saved conversation history.
@@ -574,6 +587,9 @@ The first V2 activation migrates sessions but does not copy legacy V1 provider
 credentials because the formats are incompatible. Authenticate each provider
 once. Existing V2 credentials, including those copied by an earlier beta, are
 preserved; reconnect providers that return HTTP `401`.
+
+Upgrading from OpenCode `2.0.13` validates a private copy of the existing V2 state
+before activation, preserving conversations, provider sign-ins and session permissions.
 
 ## Expose Read-Only MCP to Home Assistant
 

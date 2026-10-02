@@ -31,7 +31,7 @@ const V2_BIN = join(
   "bin",
   "opencode.exe",
 );
-const TARGET_VERSION = "2.0.13";
+const TARGET_VERSION = "2.0.22";
 const PREVIOUS_VERSION = "0.0.0-beta-18684";
 const PREVIOUS_BIN = join(ADDON_ROOT, "rootfs", "opt", "opencode-v2-homeassistant",
   "node_modules", "@opencode-ai", "cli", "bin", "opencode2.exe");
@@ -465,13 +465,15 @@ describe("OpenCode V2 copy-on-write migration", () => {
     await assert.rejects(readFile(join(root, "current")), { code: "ENOENT" });
   });
 
-  it("preserves failed-upgrade input and keeps only validated active state after a successful forward upgrade", async () => {
-    const root = join(sandbox, "upgrade-v2");
-    const source = join(sandbox, "upgrade-v1");
+  for (const [version, binary] of [[PREVIOUS_VERSION, PREVIOUS_BIN],
+    ["2.0.13", join(ADDON_ROOT, "rootfs/opt/opencode-v2-homeassistant/node_modules/opencode-previous/bin/opencode.exe")]]) {
+  it(`preserves failed-upgrade input and validated state when upgrading ${version}`, async () => {
+    const root = join(sandbox, `upgrade-v2-${version}`);
+    const source = join(sandbox, `upgrade-v1-${version}`);
     await mkdir(source);
     await writeFile(join(source, "auth.json"), AUTH_SECRET);
     const previousArgs = ["prepare", "--root", root, "--source-data", source,
-      "--v2-bin", PREVIOUS_BIN, "--target-version", PREVIOUS_VERSION, "--timeout", "30"];
+      "--v2-bin", binary, "--target-version", version, "--timeout", "30"];
     const initial = runMigrator(python, previousArgs);
     assert.equal(initial.status, 0, initial.stderr);
     const previous = JSON.parse(initial.stdout).generation;
@@ -527,4 +529,5 @@ describe("OpenCode V2 copy-on-write migration", () => {
     assert.match(downgrade.stderr, /target_version_mismatch/);
     assert.equal((await readFile(join(root, "current"), "utf8")).trim(), result.generation);
   });
+  }
 });

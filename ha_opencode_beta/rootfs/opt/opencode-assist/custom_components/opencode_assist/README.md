@@ -1,7 +1,8 @@
 # OpenCode Assist companion (experimental)
 
-Targets **Home Assistant 2026.10 with Supervisor**. Companion **0.1.0b6** in beta **3.2.0b5**
-limits each app connection to one conversation agent and one AI data task.
+Targets **Home Assistant 2026.10 with Supervisor**. Companion **0.1.0b7** in beta **3.2.0b6**
+ships the add-on's icon/logo through HA's local `brand/` support and limits each
+app connection to one conversation agent and one AI data task.
 Existing entities remain configurable; duplicate setup shows guidance instead
 of adding another entity of the same type.
 
@@ -33,8 +34,8 @@ uses the same supported-type declaration for Add and Configure, so the Add butto
 remain visible even after a type has been added; duplicate creation is rejected.
 Removing a service lets you add that type again. Existing duplicate entities from
 earlier versions are retained and can still be configured or removed individually.
-Once paired, the app's **Set up OpenCode Assist** page opens the existing
-integration so you can add the second type there.
+Once paired, open **Settings → Devices & services → OpenCode Assist** to add
+the second type to the existing connection.
 
 The image and release `opencode-assist.zip` use this same source directory; no
 integration code is downloaded at runtime. Automatic installation only updates
@@ -56,9 +57,9 @@ app/worker restarts from repeating it. HA clears notifications on Core restart;
 if delivery was delayed until after you already restarted, dismiss the reminder.
 No automatic Core restart is performed.
 
-The administrator-only **Set up OpenCode Assist** link in both Ingress modes
-provides status, installation/restart guidance and a link to HA setup, including
-on mobile. If discovery is missing, check the app log for installation conflicts,
+Beta **3.2.0b6** removes the redundant Assist setup header from both Ingress modes.
+Setup is available through HA discovery or **Add integration → OpenCode Assist**,
+including on mobile. If discovery is missing, check the app log for installation conflicts,
 restart Core after installing/updating the companion, then retry when Supervisor
 and OpenCode are available. If there are no models, configure a provider/model
 in OpenCode and resubmit; no pairing is created before a model is available.

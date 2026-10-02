@@ -1,7 +1,8 @@
 {
-  "revision": "9fba129ddf968df1e5fb6916b84d3ceb35493198",
+  "revision": "90726f9949da3408b2baf0f997e24bd71455946e",
   "source": "packages/ui/src/lib/i18n/messages/*.ts: opencodeUpdate.toast.available.manualDescription",
   "messages": {
+    "nl": "Versie {version} beschikbaar. Werk OpenCode bij op de manier waarop u het hebt geïnstalleerd en herstart daarna OpenChamber.",
     "en": "Version {version} available. Update OpenCode the way you installed it, then restart OpenChamber.",
     "de": "Version {version} verfügbar. Aktualisieren Sie OpenCode so, wie Sie es installiert haben, und starten Sie OpenChamber dann neu.",
     "fr": "Version {version} disponible. Mettez à jour OpenCode comme vous l’avez installé, puis redémarrez OpenChamber.",

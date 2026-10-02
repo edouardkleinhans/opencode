@@ -23,7 +23,7 @@ export async function startAssistUiFixture(mode) {
   // Match the pinned ttyd/container and OpenChamber fullscreen layout contracts.
   const upstream = createServer((req, res) => {
     res.writeHead(200, { "content-type": "text/html" });
-    res.end(`<!doctype html><html><head><style>html,body{height:100%;min-height:100%;margin:0;overflow:hidden}#terminal-container,#root{height:100%}.h-screen{height:100vh;min-height:100dvh}</style></head><body>${mode === "terminal" ? '<div id="terminal-container">Terminal</div>' : '<div id="root"><div class="flex flex-col h-screen">OpenChamber</div></div>'}</body></html>`);
+    res.end(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{height:100%;min-height:100%;margin:0;overflow:hidden}#terminal-container,#root{height:100%}.h-screen{height:100vh;min-height:100dvh}</style></head><body>${mode === "terminal" ? '<div id="terminal-container">Terminal</div>' : '<div id="root"><div class="flex flex-col h-screen">OpenChamber</div></div>'}</body></html>`);
   });
   await listen(upstream);
   const proxyPath = fileURLToPath(new URL("../../rootfs/usr/local/bin/openchamber-ingress-proxy.js", import.meta.url));

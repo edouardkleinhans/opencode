@@ -15,7 +15,8 @@ def main():
     manifest = json.loads((source / "manifest.json").read_text())
     if manifest["domain"] != "opencode_assist" or not manifest.get("version"):
         raise ValueError("Invalid companion manifest")
-    files = sorted([*source.glob("*.py"), *source.glob("*.json"), *source.glob("translations/*.json"), source / "README.md"])
+    files = sorted([*source.glob("*.py"), *source.glob("*.json"), *source.glob("translations/*.json"),
+                    *source.glob("brand/*.png"), source / "README.md"])
     for path in files:
         if path.is_symlink() or not path.is_file():
             raise ValueError("Companion assets must be ordinary files")

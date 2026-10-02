@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## 3.2.0b6
+
+- Upgrade the pinned OpenCode CLI/plugin to 2.0.22 and OpenChamber to 2.1.0, preserving app-managed updates, Ingress, HA editor support and existing conversations/sign-ins.
+- Remove the redundant “Set up OpenCode Assist” header from terminal and OpenChamber Ingress; configure Assist through Home Assistant discovery or Add integration.
+- Reuse the add-on icon and logo in the HA integration via companion 0.1.0b7; restart Home Assistant Core after updating to load the new branding.
+- Clarify that Assist voice requires separately configured speech engines, such as Home Assistant Cloud or Whisper and Piper; OpenCode text chat works without them.
 ## 3.2.0b5
 
 - Limit each Assist app connection to one conversation agent and one AI data task, with clear duplicate-setup guidance and existing Configure actions retained.

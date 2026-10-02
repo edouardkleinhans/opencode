@@ -56,7 +56,7 @@ export async function checkManagedUpdateNotice({ browser, page, base, session })
         if (url.origin === "http://homeassistant:8123" && path === base + "api/opencode/upgrade-status" && method === "GET") {
           await request.respond({
             status: 200, contentType: "application/json",
-            body: JSON.stringify({ available: true, currentVersion: "2.0.13", latestVersion: VERSION, upgrade: { supported: false, manager: "external", reason: "external" } }),
+            body: JSON.stringify({ available: true, currentVersion: "2.0.22", latestVersion: VERSION, upgrade: { supported: false, manager: "external", reason: "external" } }),
           });
           return;
         }

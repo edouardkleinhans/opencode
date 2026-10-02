@@ -220,7 +220,7 @@ def main():
         status_file(args.status_file, result)
         print(f"OpenCode Assist companion {result['version']}: {result['action']}", flush=True)
         print("Restart Home Assistant (Core), not only this app, after installing or updating the companion. "
-              "If you already restarted HA after this installation, continue with Set up OpenCode Assist. "
+              "If you already restarted HA after this installation, configure OpenCode Assist in Settings → Devices & services. "
               "HA is never restarted automatically.", flush=True)
     except (InstallError, OSError, ValueError, KeyError) as error:
         # The Ingress fallback can explain a blocked install without exposing raw
