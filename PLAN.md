@@ -39,9 +39,26 @@ the remaining list current instead of accumulating historical plans.
 - Release companion package: `/tmp/opencode/ha-release-artifacts-3.2.0b3/opencode-assist.zip`, SHA256
   `ec21e4c162fa2f77bd8eed94a133f08f0d31a358f506b99974163b1517f05633`.
   Supervised HA/voice-pipeline and physical iOS acceptance remain pending.
-- User approved committing, pushing and releasing **3.2.0b3**. Publish and verify
-  both native architecture images before tagging so the release workflow can
-  advance the HA storefront from b2 to b3 with images already available.
+- Published [beta 3.2.0b3](https://github.com/magnusoverli/opencode/releases/tag/beta-v3.2.0b3)
+  from `9a44be4b6225f8a72e208524112accfdefad69d8` with the user's approval to
+  commit, push and release. Storefront commit `e81d6ff` advertises b3.
+- Main CI `36986905721` passed: **299 beta tests / 2 environment skips**, all
+  **15 HA 2026.10 contracts**, and **19 shared MCP discovery tests**. Native
+  amd64/ARM64 checks `36986905684` and pre-tag publication `36986914726` passed;
+  both images were available before tagging. Release workflow `36987528876`
+  and tag-build/publication `36987528885` also passed.
+- The released `image-manifest.txt` matches the final registry index:
+  `sha256:86dd1372dbc29a19dc9d7625bf321ab4a4b84fe4f473955861b84cef62892747`.
+  Platform manifests: amd64
+  `sha256:61ba606138ce1163b22c72f067697c7486e890c5ca10062b3a8d08e41545060a`;
+  ARM64 `sha256:246a1ed613c2dfab7e26e9bc3796b3175a2aadacbfedf17aa044dd503f91ed33`.
+- Downloaded release assets under `/tmp/opencode/ha-release-artifacts-3.2.0b3/published/`.
+  The companion ZIP matches the candidate and all **13 source files**. Pulled
+  the final amd64 image by digest: version/architecture labels are correct,
+  OpenCode remains **2.0.13**, the restart notification module is present, and
+  all **13 bundled companion files** match the release ZIP byte-for-byte.
+- Posted the release update to [#45](https://github.com/magnusoverli/opencode/issues/45#issuecomment-5948782479);
+  the broader native-integration roadmap remains open.
 
 ## Assist fixes and Supervisor-native onboarding — beta 3.2.0b2
 
