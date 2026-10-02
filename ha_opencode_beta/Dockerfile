@@ -58,14 +58,16 @@ RUN --mount=type=bind,source=test/openchamber-request-body.mjs,target=/tmp/openc
 FROM --platform=$BUILDPLATFORM golang:1.24-trixie AS hab-builder
 
 ARG BUILD_ARCH
-ARG HAB_VERSION=1.6.4
-RUN git clone --depth 1 --branch "${HAB_VERSION}" https://github.com/balloob/home-assistant-build-cli.git /src
+ARG HAB_VERSION=1.7.1
+ARG HAB_REVISION=41edb473ebf2eab1502c3f3075a3b0c91ec0eff7
+RUN git clone --depth 1 --branch "${HAB_VERSION}" https://github.com/balloob/home-assistant-build-cli.git /src \
+    && test "$(git -C /src rev-parse HEAD)" = "${HAB_REVISION}"
 WORKDIR /src
 
 # Cross-compile for the target architecture
 RUN case "${BUILD_ARCH}" in amd64|aarch64) ;; *) echo "Unsupported BUILD_ARCH: ${BUILD_ARCH:-unset}" >&2; exit 1;; esac \
     && GOARCH=$([ "$BUILD_ARCH" = "aarch64" ] && echo "arm64" || echo "amd64") \
-    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /hab .
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X main.version=${HAB_VERSION}" -o /hab .
 
 ## Stage 2: Main add-on image
 FROM $BUILD_FROM AS runtime
@@ -341,6 +343,9 @@ RUN set -e; \
 # injection on both supported architectures. It is not part of ordinary local image builds;
 # the Supervisor devcontainer separately covers the shipped s6 service graph.
 FROM runtime AS boundary-test
+RUN --network=none --mount=type=bind,source=test/hab-cli-fixture.mjs,target=/tmp/hab-cli-fixture.mjs,readonly \
+    timeout --signal=TERM --kill-after=10s 120s node /tmp/hab-cli-fixture.mjs
+
 RUN --network=none --mount=type=bind,source=test/v2-openchamber-browser.mjs,target=/tmp/v2-openchamber-browser.mjs,readonly \
     timeout --signal=TERM --kill-after=10s 180s node /tmp/v2-openchamber-browser.mjs
 

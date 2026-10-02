@@ -24,6 +24,14 @@ Find out before proposing anything — the two are not interchangeable.
 `hab dashboard get <url_path> --json` gives you the current structure to modify;
 read it before writing, exactly as with any config file.
 
+Use `hab_run(args=["schema","dashboard","card","update"])` to learn the exact
+operation. Prefer an individual view/section/card/badge operation; 1.7.1 accepts
+view paths as well as indices. Re-read positional indices before applying. A
+`--data`/`--file` update replaces the selected object, so preserve existing options.
+`--plan` describes intended execution but is not necessarily a current-state diff.
+Large result artifacts contain a CLI envelope: inspect `success`, then extract
+the configuration from `data` before saving. Verify with a read-back and rendering.
+
 ## Building a view
 
 Start from what the home actually has: `get_home_context` for the area and its
@@ -38,9 +46,10 @@ layout cards `grid`, `vertical-stack`, `horizontal-stack`, `sections`.
 
 - **`conditional`** shows a card only while a condition holds — the usual way to
   hide something that is irrelevant most of the time.
-- **`custom:`** cards come from HACS. Check the resource is actually installed
-  (`hab dashboard resources list`, or the `www/` folder) before writing one in;
-  a missing custom card renders as an error box for the user.
+- **`custom:`** cards require an installed and registered resource. Check HA's
+  dashboard Resources UI and existing rendered cards before relying on one;
+  a file in `www/` alone does not prove registration. The pinned hab has no
+  `dashboard resources` command. Marketplace commands require HA 2026.11+.
 - **card-mod** styling is a custom-card feature too, and equally dependent on
   the resource being present.
 

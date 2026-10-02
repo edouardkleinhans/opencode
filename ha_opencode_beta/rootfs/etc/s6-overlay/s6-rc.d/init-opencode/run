@@ -724,7 +724,7 @@ if command -v hab &>/dev/null; then
     if [ "${HELP_STAMP_FRESH}" = "true" ]; then
         HAB_VERSION="${STAMP_HAB}"
     else
-        HAB_VERSION=$(hab version 2>/dev/null | grep -oP '[\d.]+' | head -1 || echo "unknown")
+        HAB_VERSION=$(hab version --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{try{const v=JSON.parse(s).data.version;if(!/^\d+\.\d+\.\d+$/.test(v))throw 0;console.log(v)}catch{process.exit(1)}})' || echo "unknown")
     fi
     bashio::log.info "hab CLI available (v${HAB_VERSION}) - pre-authenticated via Supervisor"
 else

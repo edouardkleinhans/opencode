@@ -61,9 +61,10 @@ credentials and never opens interactive setup or loads a project `.env`.
 
 ## Renaming — the thing zigporter is for
 
-`hab entity update` and `hab device update` rename **one thing** and leave every
-reference to the old ID dangling. `zigporter` cascades: it patches automations,
-scripts, scenes and every Lovelace dashboard in one atomic pass.
+`hab entity rename` changes the **friendly name**, not the entity ID. The pinned
+CLI has no `entity update` or `device update`. Use `zigporter` for cascade renames
+across automations, scripts, scenes and Lovelace dashboards, inspecting the dry
+run and the template-reference limitation below.
 
 ```
 zigporter rename-entity light.old_id light.new_id      # dry run (the default)

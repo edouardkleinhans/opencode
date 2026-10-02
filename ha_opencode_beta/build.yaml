@@ -17,6 +17,8 @@ args:
   TSX_VERSION: "4.20.6"
   TTYD_VERSION: "1.7.7"
   YQ_VERSION: "v4.53.3"
+  HAB_VERSION: "1.7.1"
+  HAB_REVISION: "41edb473ebf2eab1502c3f3075a3b0c91ec0eff7"
   ZIGPORTER_VERSION: "1.4.2"
 labels:
   org.opencontainers.image.title: "OpenCode Beta"

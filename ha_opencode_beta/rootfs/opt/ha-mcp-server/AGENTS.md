@@ -187,14 +187,22 @@ is missing, the profile is reduced — say so instead of working around it.
 
 ### 3. hab CLI (Home Assistant Builder)
 
-A CLI designed for AI agents, pre-authenticated via the Supervisor token. It is
+A CLI designed for AI agents. In this V2 app, use **`hab_run`**: its sidecar supplies
+Supervisor credentials, while the agent shell does not inherit them. It is
 the primary path for dashboards, areas/floors/zones/labels, helpers,
 blueprints, backups, people, categories, to-do lists, notifications,
 integrations, repairs, events and templates — the registry-level work that has
 no YAML file behind it.
 
-`hab` prints human-readable text by default; use `--json` for structured output.
-Run `hab --help` or `hab <command> --help` for full usage.
+Prefer `hab_run(args=[...])` over quoted command strings. The gateway uses JSON.
+Start with `args=["schema"]` for a compact command index, then request the exact
+command's schema; load one `guide` topic when useful. Use specific filters and
+`--brief`/`--count`/`--limit` when supported. Schema side-effect labels and `--plan`
+are advisory, not proof of permission, a live diff or complete validation.
+Read before changing and read back afterwards. Inspect nested `success`, `error`,
+`partial_result` and warnings. A timed-out mutation needs state inspection before
+retrying. Large-output artifacts contain the CLI envelope: configuration is under
+its `data`, not the whole envelope. Never reconstruct from a truncated preview.
 
 <!-- HAB_LIVE_HELP_START -->
 *(Live hab command reference will be injected here at container startup)*
@@ -207,9 +215,10 @@ supplies credentials; the agent shell intentionally does not inherit them.
 Do not run setup or create credential files. If the current profile does not
 expose the tool, report that limitation and use available read-only MCP tools.
 
-Zigbee device management, and the only tool here that **cascades a rename**
-across automations, scripts, scenes and every Lovelace dashboard atomically.
-`hab` renames one thing and leaves the references dangling. Also handles device
+Zigbee device management, including **cascade rename** workflows across
+automations, scripts, scenes and Lovelace dashboards; inspect the dry run and
+template-reference limitations. `hab entity rename` changes a friendly name,
+not an entity ID. Also handles device
 inspection across ZHA/Z2M/HA, stale-device cleanup, and mesh visualization.
 
 Dry-run is the default for renames — always preview before `--apply`. The

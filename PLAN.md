@@ -4,6 +4,36 @@ Updated: 2026-10-02. This is the single shared plan for this work, tracked in Gi
 Only open tasks appear as checkboxes; close them with concrete evidence and keep
 the remaining list current instead of accumulating historical plans.
 
+## hab CLI effectiveness — beta 3.2.0b8
+
+- User split the work into a local beta upgrade/integration improvement and an
+  upstream handoff. `HAB_CLI_WORK_ORDER.md` specifies prioritized CLI extensions,
+  compatibility/verification requirements and staged acceptance scenarios.
+- Beta pins hab **1.7.1**, source
+  `41edb473ebf2eab1502c3f3075a3b0c91ec0eff7`, with correct binary version stamping
+  and structured startup version parsing.
+- `hab_run` accepts literal argv arrays and legacy quoted strings, applies the
+  existing auth/update policy after tokenization, defaults to JSON, and compacts
+  schema/guide discovery. Unknown schema suffixes fail explicitly. JSON failures
+  remain errors; interrupted/limited processes report unverified outcomes.
+- The process output bound is 16 MiB with existing private large-output artifacts;
+  default deadline is 60 seconds, adjustable to 120. Model-facing previews remain
+  bounded. Guidance uses actual commands and explains whole-object replacements,
+  static plan limits, CLI envelopes and read-back verification.
+- Local MCP suite: **653 passed / 4 environment skips**. Skill contracts:
+  **20 passed**. Node/shell syntax checks and whitespace checks passed.
+- Native hab fixture passed: **27 documented argv examples** match the actual
+  command tree; real MCP dispatch preserves templates, response-returning actions,
+  structured errors and a >1 MiB dashboard export. Root schema output shrank from
+  **7,732,803 bytes to 4,771 bytes**. The fixture is included in AMD64/ARM64 image CI.
+- Complete local AMD64 boundary image `opencode-beta:hab-1.7.1-local` passed,
+  including desktop/mobile Ingress browser acceptance, credential/process
+  isolation, native Zigbee, **10 installer tests** and **23 Assist tests**.
+  ARM64 execution remains a native CI check.
+- User approved commit, push and release **3.2.0b8**.
+- [ ] Pass main CI/native AMD64 and ARM64 checks, publish both images before
+  tagging, then verify final release assets and image contents.
+
 ## Runtime refresh — beta 3.2.0b6
 
 - User requested the latest OpenCode and OpenChamber pins, application-level

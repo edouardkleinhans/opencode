@@ -547,6 +547,20 @@ file before a whole-config dashboard write; never reconstruct from the preview.
 Files older than 24 hours are pruned on subsequent exports, and container restart
 clears them.
 
+The beta bundles **hab 1.7.1**, pinned to source
+`41edb473ebf2eab1502c3f3075a3b0c91ec0eff7`. Its `hab_run` tool accepts literal
+`args` arrays as well as legacy `command` strings. It returns compact command
+schemas and guide indexes on demand, defaults to JSON and preserves large
+results up to a 16 MiB process-output bound. The default deadline is 60 seconds
+(configurable to 120); a timeout or output-limit failure does not prove a
+mutation failed to apply. Use read-back verification before retrying. Dedicated
+ESPHome tools handle long-running firmware work.
+
+Large artifacts retain the CLI envelope; extract the successful result's `data`
+for a dashboard save. A CLI `--plan` can be a static preview, so inspect current
+configuration and verify the applied result. Marketplace commands require HA
+2026.11+. CLI updates are delivered with app updates.
+
 OpenChamber is built from release `2.1.0`, source commit
 `90726f9949da3408b2baf0f997e24bd71455946e`. Its web package reports upstream
 version `2.1.0`; the immutable source identifies this release. Its client

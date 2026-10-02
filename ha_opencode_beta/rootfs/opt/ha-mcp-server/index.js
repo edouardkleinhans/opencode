@@ -108,6 +108,7 @@ import { createSupervisorAppsClient } from "./lib/supervisor-apps.js";
 import { setRegistryArea } from "./lib/registry-area.js";
 import { saveHabOutput } from "./lib/hab-output.js";
 import { createCommandOutputContent } from "./lib/command-output.js";
+import { HAB_MAX_OUTPUT_BYTES, prepareHabRequest, formatHabExecution } from "./lib/hab-cli.js";
 import { discoverNativeLlmApis } from "./lib/ha-llm-apis.js";
 import {
   ESPHomeDeviceBuilderClient,
@@ -3911,16 +3912,30 @@ const TOOLS = [
   {
     name: "hab_run",
     title: "Run hab CLI Command",
-    description: "Run a Home Assistant Builder (hab) CLI command for dashboards, area/floor/zone/label/person/category management, helpers, backups, blueprints, calendars, todo lists, notifications, integrations, repairs, events, templates, devices, and search. Automation/script/scene API CRUD is available when specifically needed, but configuration edits default to YAML + write_config_safe followed by an approved domain reload via call_service and read-only verification. Needing a reload is not a reason to switch to API editing. Check 'automation --help' and subcommand help for supported payload/file options; do not guess flags or improvise JSON quoting. Output is human-readable by default; add --json for structured output. When meta.truncated is true, meta.full_output_path contains the complete temporary output; never write a dashboard reconstructed from the preview. Examples: 'entity list --domain light --json', 'area create Kitchen', 'integration reload hue', 'repairs list --json'. Run 'help' for command groups.",
+    description: "Run the pinned hab CLI for dashboards, helpers, registries and HA administration. Prefer args to avoid quoting errors. Use args:['schema'] for a compact command index, then ['schema',...commandPath] for exact arguments/flags; ['guide','list'] lists workflow topics. JSON is the default; filter lists with --brief/--count/--limit when supported. Schema annotations and --plan are advisory, not proof of permission or live validation. Read before changing, use the narrowest operation, then read back. YAML edits use write_config_safe and an approved reload. Check nested success/error/partial_result/warnings; timeout means outcome unverified, not safe to repeat. Large results provide meta.full_output_path; never rebuild a dashboard from a truncated preview. For streaming ESPHome work prefer dedicated ESPHome tools.",
     inputSchema: {
       type: "object",
       properties: {
         command: {
           type: "string",
-          description: "The hab command and arguments to run (without the 'hab' prefix). Examples: 'entity list --json', 'area create Kitchen', 'dashboard list', 'automation get my-automation', 'helper create input_boolean --name \"Guest Mode\"', 'scene list --json', 'todo item add todo.shopping \"Buy milk\"', 'notification list --json', 'integration reload hue', 'repairs list --json', 'person list --json', 'backup create', 'system info', 'overview --json'",
+          description: "Legacy quoted command string without the hab prefix. Provide this or args, never both. No shell expansion or pipelines.",
+          maxLength: 262144,
+        },
+        args: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 1,
+          maxItems: 256,
+          description: "Preferred argv array without hab. Examples: ['schema','dashboard','card','update'], ['entity','list','--domain','light','--brief','--limit','20'], ['helper','input-boolean','create','Guest Mode']. Each payload is one literal argument.",
+        },
+        timeout_seconds: {
+          type: "integer",
+          minimum: 1,
+          maximum: 120,
+          default: 60,
+          description: "Bounded process deadline, default 60 seconds including HA reload waits. A timed-out mutation requires read-back before retry.",
         },
       },
-      required: ["command"],
       additionalProperties: false,
     },
     annotations: {
@@ -6987,31 +7002,14 @@ async function handleToolCall(request) {
 
       // === HAB CLI INTEGRATION ===
       case "hab_run": {
-        const { command } = args;
-        if (!command || typeof command !== "string") {
-          throw new Error("command parameter is required and must be a string");
-        }
-        
-        // Security: block dangerous commands
-        const lowerCmd = command.toLowerCase().trim();
-        if (lowerCmd.startsWith("auth ") || lowerCmd === "auth") {
-          throw new Error("Auth commands are not needed - hab is pre-authenticated via Supervisor token.");
-        }
-        if (lowerCmd.startsWith("update") && !lowerCmd.startsWith("update ")) {
-          throw new Error("Self-update of hab is not supported inside the container. hab is updated with the add-on.");
-        }
-        
-        // Parse command string into args array for execFile (safe, no shell injection)
-        const cmdArgs = command.match(/(?:[^\s"']+|"[^"]*"|'[^']*')/g) || [];
-        // Strip quotes from args
-        const cleanArgs = cmdArgs.map(arg => arg.replace(/^["']|["']$/g, ""));
-        sendLog("info", "hab", { action: "run_command", argument_count: cleanArgs.length });
+        const request = prepareHabRequest(args);
+        sendLog("info", "hab", { action: "run_command", command: request.root, argument_count: request.argv.length });
         
         // For esphome subcommands, pre-discover the ESPHome ingress URL so
         // hab can skip its own (broken direct-connection) discovery and route
         // through the Supervisor ingress proxy instead.
         let esphomeEnv = {};
-        if (lowerCmd.startsWith("esphome ") || lowerCmd === "esphome") {
+        if (request.root === "esphome" && !request.argv.some((value) => ["--help", "-h", "--help=true"].includes(value))) {
           if (!HA_ACCESS_TOKEN) {
             throw new Error(ESPHOME_TOKEN_ERROR);
           }
@@ -7032,15 +7030,15 @@ async function handleToolCall(request) {
           }
         }
         
-        let result;
+        let result, failure;
         try {
-          result = await runCancellableExecFile("/usr/local/bin/hab", cleanArgs, {
-            timeoutMs: 30000,
-            maxBuffer: 1024 * 1024,
+          result = await runCancellableExecFile("/usr/local/bin/hab", request.argv, {
+            timeoutMs: request.timeoutMs,
+            maxBuffer: HAB_MAX_OUTPUT_BYTES,
             env: {
               ...process.env,
               SUPERVISOR_TOKEN,
-              HAB_URL: "http://supervisor/core",
+              HAB_URL: `${SUPERVISOR_BASE_URL}/core`,
               HAB_TOKEN: SUPERVISOR_TOKEN,
               ...(HA_ACCESS_TOKEN ? { HA_ACCESS_TOKEN } : {}),
               ...esphomeEnv,
@@ -7048,15 +7046,14 @@ async function handleToolCall(request) {
           });
         } catch (error) {
           throwIfRequestCancelled();
-          throw new Error(`hab command failed: ${error.stdout || error.stderr || error.message}`);
+          failure = error;
+          result = error.stdout || "";
         }
         
-        return makeCompatibleResponse({
-          content: [createCommandOutputContent("hab", command, result, {
+        return makeCompatibleResponse(formatHabExecution(request, result, failure, {
             audience: ["user", "assistant"], priority: 0.7,
             saveLargeOutput: saveHabOutput,
-          })],
-        });
+        }));
       }
 
       // === ZIGPORTER CLI INTEGRATION ===
