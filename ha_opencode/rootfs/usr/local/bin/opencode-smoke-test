@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Exercise the managed V2 paths; availability of another runtime is not a pass.
+set -uo pipefail
+QUIET=false
+case "${1:-}" in --quiet|-q) QUIET=true ;; "") ;; *) exit 2 ;; esac
+PASSED=0
+FAILED=0
+SKIPPED=0
+pass() { PASSED=$((PASSED + 1)); [ "${QUIET}" = true ] || printf 'ok    %s\n' "$1"; }
+fail() { FAILED=$((FAILED + 1)); printf 'FAIL  %s\n' "$1" >&2; }
+skip() { SKIPPED=$((SKIPPED + 1)); [ "${QUIET}" = true ] || printf 'skip  %s\n' "$1"; }
+source /usr/local/lib/opencode/runtime.sh
+CERTIFIED=$(opencode_v2_certified_version)
+if [ "$(command -v opencode)" = /usr/local/bin/opencode ] \
+    && [ "$(opencode --version)" = "opencode v${CERTIFIED}" ] \
+    && [ "$(opencode2 --version)" = "opencode v${CERTIFIED}" ]; then
+    pass "both public CLI spellings use pinned V2 ${CERTIFIED}"
+else fail "public CLI identity"; fi
+if [ ! -e /usr/local/lib/node_modules/opencode-ai ]; then
+    pass "V1 runtime is absent"
+else fail "V1 runtime is still installed"; fi
+if [ "$(opencode_v2_probe_version /usr/local/libexec/opencode-v2)" = "${CERTIFIED}" ]; then
+    pass "CPU-selected private binary matches the pin"
+else fail "CPU-selected private binary version"; fi
+if opencode status >/dev/null; then
+    pass "non-starting status reaches the managed conversation server"
+else fail "managed conversation server health"; fi
+if timeout --signal=TERM --kill-after=10s 60s /usr/local/bin/opencode-v2-self-test --quiet; then
+    pass "authenticated runtime, context, MCP and read-only policy"
+else fail "authenticated V2 policy"; fi
+if [ "$(cat /run/opencode-v2-homeassistant.ready 2>/dev/null)" = /homeassistant ] \
+    && [ -d /homeassistant ]; then
+    pass "Home Assistant workspace is available"
+else fail "Home Assistant workspace"; fi
+CAP_BND=$(awk '/^CapBnd:/ { print $2 }' /proc/1/status)
+if [ $((16#${CAP_BND} & (1 << 21))) -eq 0 ]; then
+    pass "SYS_ADMIN is absent"
+else fail "SYS_ADMIN must be absent"; fi
+if curl -fsS --max-time 10 http://127.0.0.1:8099/ >/dev/null; then
+    pass "Ingress front end responds"
+else fail "Ingress front end"; fi
+if [ "$(cat /run/opencode-v2/lsp-enabled 2>/dev/null)" = true ]; then
+    if [ "$(node /usr/local/bin/opencode-lsp-probe.mjs)" = ok ]; then
+        pass "V2 LSP worker reaches Home Assistant with its isolated credential"
+    else fail "V2 LSP worker connection"; fi
+else skip "V2 LSP is disabled by configuration"; fi
+PRETTIER_PIN=$(node -p "require('/opt/opencode-v2-homeassistant/node_modules/prettier/package.json').version")
+if [ "$(prettier --version)" = "${PRETTIER_PIN}" ] \
+    && jq -e '.formatter["ha-yaml"].command == ["prettier", "--write", "$FILE"]' /run/opencode-v2/managed.json >/dev/null; then
+    pass "pinned Prettier ${PRETTIER_PIN} is wired to V2 YAML edits"
+else fail "V2 formatter configuration or executable"; fi
+if [ "$(cat /data/.interface_mode)" = openchamber ]; then
+    if curl -fsS --max-time 10 http://127.0.0.1:3010/api/info \
+        | jq -e --arg version "${CERTIFIED}" '.version == $version' >/dev/null; then
+        pass "OpenChamber reaches the pinned V2 backend"
+    else fail "OpenChamber V2 backend connection"; fi
+else skip "OpenChamber is not the selected interface"; fi
+printf '%s checks passed, %s failed, %s skipped\n' "${PASSED}" "${FAILED}" "${SKIPPED}"
+[ "${FAILED}" -eq 0 ]

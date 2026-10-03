@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec /opt/zigporter-venv/bin/python3 -I -B -u /opt/zigporter/managed-cli.py "$@"

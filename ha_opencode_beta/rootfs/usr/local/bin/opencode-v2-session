@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+
+set -u
+
+# shellcheck source=/usr/local/lib/opencode/channel.sh
+source /usr/local/lib/opencode/channel.sh
+
+BLUE='\033[38;2;29;153;243m'
+GREEN='\033[38;2;17;209;22m'
+YELLOW='\033[38;2;246;116;0m'
+CYAN='\033[38;2;26;188;156m'
+GRAY='\033[38;2;127;140;141m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+ADDON_VERSION=$(cat /data/.addon_version 2>/dev/null || echo "unknown")
+V2_VERSION=$(cat /usr/local/share/opencode-v2-certified-version 2>/dev/null || echo "unknown")
+
+clear
+echo ""
+echo -e "${BLUE}${BOLD}${ADDON_CHANNEL_LABEL}${NC} ${GRAY}v${ADDON_VERSION}${NC}"
+echo -e "${GRAY}Current TUI: OpenCode V2 ${V2_VERSION}${NC}"
+echo -e "${GRAY}AI-powered coding agent for Home Assistant${NC}"
+echo ""
+echo -e "${GRAY}────────────────────────────────────────────────────────────${NC}"
+echo ""
+echo -e "${GREEN}V2 terminal security boundary${NC}"
+echo -e "${GRAY}The TUI runs as uid 60001; the V2 server runs as root for HAOS compatibility.${NC}"
+echo -e "${GRAY}Home Assistant configuration is mounted at ${CYAN}/homeassistant${NC}."
+echo -e "${GRAY}Use ${GREEN}opencode status${GRAY} to inspect this server without starting another service.${NC}"
+if jq -e '(.source.provider_auth_count // 0) > 0' /data/v2/migration.json >/dev/null 2>&1; then
+    echo -e "${YELLOW}Provider sign-ins copied by an earlier beta may be stale; run /connect again after any HTTP 401.${NC}"
+fi
+echo ""
+
+if [ ! -f /run/opencode-v2/ready ] || [ ! -f /run/opencode-v2-homeassistant.ready ]; then
+    if [ -f /run/opencode-v2/configuration-error ]; then
+        echo -e "${YELLOW}${BOLD}OpenCode could not start: custom configuration could not be prepared.${NC}"
+        echo -e "${GRAY}Check the add-on logs for 'opencode_config' or 'external_mcp_config'.${NC}"
+        echo -e "${GRAY}Correct the corresponding option in the Configuration tab, then restart the add-on.${NC}"
+        echo -e "${GRAY}The Home Assistant sidecar waits for valid configuration; reinstalling is not required.${NC}"
+    elif jq -e '.status == "failed" and .error == "session_projection_mismatch"' /data/v2/migration.json >/dev/null 2>&1; then
+        echo -e "${YELLOW}${BOLD}OpenCode could not start: conversation migration needs attention.${NC}"
+        echo -e "${GRAY}The V1-to-V2 session check found a mismatch. Your existing state was preserved.${NC}"
+        echo -e "${GRAY}Check the add-on logs for 'session_projection_mismatch' and the differing field names.${NC}"
+    else
+        echo -e "${YELLOW}${BOLD}OpenCode could not start: the V2 server is not ready.${NC}"
+        echo -e "${GRAY}Check the add-on logs for the startup error.${NC}"
+    fi
+    echo -e "${GRAY}To return to 2.x, restore your pre-upgrade Home Assistant backup (app and data).${NC}"
+    echo -e "${GRAY}Restart the add-on after a corrected update to retry. This screen stays open.${NC}"
+    exec sleep infinity
+fi
+
+if [ ! -x /usr/local/bin/opencode-v2-tui-launch ]; then
+    echo -e "${YELLOW}V2 TUI launcher is unavailable. Inspect the app logs.${NC}" >&2
+    exit 126
+fi
+
+exec /usr/local/bin/opencode-v2-tui-launch /run/opencode-v2

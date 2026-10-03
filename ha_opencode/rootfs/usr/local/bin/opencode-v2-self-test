@@ -1,0 +1,447 @@
+#!/usr/bin/env python3
+"""Exercise the active V2 authenticated policy without exposing credentials."""
+
+import base64
+import ctypes
+import fnmatch
+import json
+import os
+import resource
+import re
+import signal
+import stat
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+
+MAX_RESPONSE_BYTES = 1024 * 1024
+READ_ONLY_AGENT = "home-assistant-read-only"
+DEFAULT_RUNTIME_ROOT = "/run/opencode-v2"
+DEFAULT_BASE_URL = "http://127.0.0.1:4100"
+SELF_TEST_DEADLINE_SECONDS = 45
+CANCELLED_SIGNAL = None
+
+
+class SelfTestError(Exception):
+    pass
+
+
+class DeadlineExceeded(SelfTestError):
+    pass
+
+
+def check_cancelled():
+    if CANCELLED_SIGNAL is not None:
+        raise SelfTestError(f"cancelled by signal {CANCELLED_SIGNAL}")
+
+
+class Reporter:
+    def __init__(self, quiet):
+        self.quiet = quiet
+        self.passed = 0
+        self.skipped = 0
+
+    def ok(self, message):
+        self.passed += 1
+        if not self.quiet:
+            print(f"ok  {message}")
+
+    def skip(self, message):
+        self.skipped += 1
+        if not self.quiet:
+            print(f"skip  {message}")
+
+
+class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, message, headers, new_url):
+        return None
+
+
+def harden_process(reporter):
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.prctl(4, 0, 0, 0, 0) != 0:  # PR_SET_DUMPABLE
+        error = ctypes.get_errno()
+        raise SelfTestError(f"could not disable process inspection (errno {error})")
+    reporter.ok("self-test process is non-dumpable with core dumps disabled")
+
+
+def validate_base_url(value):
+    parsed = urllib.parse.urlsplit(value)
+    if parsed.scheme != "http" or parsed.hostname != "127.0.0.1" or parsed.username or parsed.password:
+        raise SelfTestError("V2 self-test URL must be unauthenticated HTTP on 127.0.0.1")
+    try:
+        port = parsed.port
+    except ValueError:
+        raise SelfTestError("V2 self-test URL has an invalid port") from None
+    if parsed.path not in ("", "/") or parsed.query or parsed.fragment or port is None:
+        raise SelfTestError("V2 self-test URL must contain only a loopback host and port")
+    return value.rstrip("/")
+
+
+def read_runtime_material(runtime_root, reporter):
+    if not os.path.isabs(runtime_root):
+        raise SelfTestError("V2 runtime root must be absolute")
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
+    file_flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
+    root_fd = os.open(runtime_root, directory_flags)
+    try:
+        root_status = os.fstat(root_fd)
+        if root_status.st_uid != 0 or stat.S_IMODE(root_status.st_mode) & 0o022:
+            raise SelfTestError("V2 runtime root is not root-owned and non-writable by group/other")
+        reporter.ok("runtime root is root-owned and non-writable by group/other")
+
+        ready_status = os.stat("ready", dir_fd=root_fd, follow_symlinks=False)
+        if not stat.S_ISREG(ready_status.st_mode) or ready_status.st_uid != 0:
+            raise SelfTestError("V2 ready marker is not a root-owned regular file")
+        reporter.ok("root-owned V2 readiness marker is present")
+
+        enabled = {}
+        for marker, label in (
+            ("mcp-enabled", "MCP"),
+            ("native-mcp-enabled", "native MCP"),
+            ("lsp-enabled", "LSP"),
+        ):
+            marker_fd = os.open(marker, file_flags, dir_fd=root_fd)
+            try:
+                marker_status = os.fstat(marker_fd)
+                if not stat.S_ISREG(marker_status.st_mode) or marker_status.st_uid != 0:
+                    raise SelfTestError(f"V2 {label} marker is not a root-owned regular file")
+                if stat.S_IMODE(marker_status.st_mode) != 0o600:
+                    raise SelfTestError(f"V2 {label} marker mode is not 0600")
+                marker_value = os.read(marker_fd, 16).decode("ascii").strip()
+            finally:
+                os.close(marker_fd)
+            if marker_value not in ("true", "false"):
+                raise SelfTestError(f"V2 {label} marker has an invalid value")
+            enabled[marker] = marker_value == "true"
+            reporter.ok(f"root-owned V2 {label} expectation is valid")
+
+        password_fd = os.open("server-password", file_flags, dir_fd=root_fd)
+        try:
+            password_status = os.fstat(password_fd)
+            if not stat.S_ISREG(password_status.st_mode) or password_status.st_uid != 0:
+                raise SelfTestError("V2 server password is not a root-owned regular file")
+            if stat.S_IMODE(password_status.st_mode) != 0o600:
+                raise SelfTestError("V2 server password mode is not 0600")
+            password = bytearray(os.read(password_fd, 1025).rstrip(b"\r\n"))
+        finally:
+            os.close(password_fd)
+
+        external_fd = os.open("external-mcp-enabled", file_flags, dir_fd=root_fd)
+        try:
+            external_status = os.fstat(external_fd)
+            if not stat.S_ISREG(external_status.st_mode) or external_status.st_uid != 0:
+                raise SelfTestError("external MCP expectation is not a root-owned regular file")
+            if stat.S_IMODE(external_status.st_mode) != 0o600:
+                raise SelfTestError("external MCP expectation mode is not 0600")
+            external_raw = os.read(external_fd, 4097)
+        finally:
+            os.close(external_fd)
+        if len(external_raw) > 4096:
+            raise SelfTestError("external MCP expectation is too large")
+        try:
+            external_names = json.loads(external_raw)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise SelfTestError("external MCP expectation is invalid JSON") from None
+        if (
+            not isinstance(external_names, list)
+            or len(external_names) > 16
+            or len(external_names) != len(set(external_names))
+            or any(not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", name) for name in external_names)
+        ):
+            raise SelfTestError("external MCP expectation contains invalid server names")
+        reporter.ok("root-owned external MCP expectation is valid")
+    finally:
+        os.close(root_fd)
+
+    if not password or len(password) > 1024:
+        for index in range(len(password)):
+            password[index] = 0
+        raise SelfTestError("V2 server password has an invalid length")
+    reporter.ok("server password is a bounded root-only file opened without following symlinks")
+    return password, enabled["mcp-enabled"], enabled["native-mcp-enabled"], enabled["lsp-enabled"], external_names
+
+
+class ApiClient:
+    def __init__(self, base_url, password):
+        credential = bytearray(b"opencode:")
+        credential.extend(password)
+        self.authorization = "Basic " + base64.b64encode(credential).decode("ascii")
+        for index in range(len(credential)):
+            credential[index] = 0
+        for index in range(len(password)):
+            password[index] = 0
+        self.base_url = base_url
+        self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirectHandler())
+
+    def request(
+        self, path, method="GET", payload=None, expected=200, authenticated=True, decode=True,
+        observe_cancellation=True,
+    ):
+        if observe_cancellation:
+            check_cancelled()
+        if not path.startswith("/"):
+            raise SelfTestError("internal self-test path is not absolute")
+        body = None if payload is None else json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        headers = {"Accept": "application/json"}
+        if authenticated:
+            headers["Authorization"] = self.authorization
+        if body is not None:
+            headers["Content-Type"] = "application/json"
+        request = urllib.request.Request(self.base_url + path, data=body, headers=headers, method=method)
+        try:
+            with self.opener.open(request, timeout=2) as response:
+                status = response.status
+                content_type = response.headers.get("Content-Type", "unset")
+                response_body = response.read(MAX_RESPONSE_BYTES + 1)
+        except urllib.error.HTTPError as error:
+            with error:
+                status = error.code
+                content_type = error.headers.get("Content-Type", "unset")
+                response_body = error.read(MAX_RESPONSE_BYTES + 1)
+        except (OSError, urllib.error.URLError) as error:
+            raise SelfTestError(f"{method} {path} failed to connect: {type(error).__name__}") from None
+        if status != expected:
+            raise SelfTestError(f"{method} {path} returned HTTP {status}, expected {expected}")
+        if len(response_body) > MAX_RESPONSE_BYTES:
+            raise SelfTestError(f"{method} {path} exceeded the response limit")
+        if not decode:
+            if observe_cancellation:
+                check_cancelled()
+            return None
+        try:
+            result = json.loads(response_body)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise SelfTestError(
+                f"{method} {path} returned invalid JSON ({len(response_body)} bytes, {content_type})"
+            ) from None
+        if observe_cancellation:
+            check_cancelled()
+        return result
+
+
+def data_field(response, path):
+    if not isinstance(response, dict) or "data" not in response:
+        raise SelfTestError(f"{path} omitted its data envelope")
+    return response["data"]
+
+
+def assert_permission(rules, action, resource_name, expected, reporter):
+    effect = None
+    for rule in rules:
+        if not isinstance(rule, dict):
+            raise SelfTestError("read-only agent contains an invalid permission rule")
+        rule_action = rule.get("action")
+        rule_resource = rule.get("resource")
+        rule_effect = rule.get("effect")
+        if not all(isinstance(value, str) for value in (rule_action, rule_resource, rule_effect)):
+            raise SelfTestError("read-only agent contains an incomplete permission rule")
+        if fnmatch.fnmatchcase(action, rule_action) and fnmatch.fnmatchcase(resource_name, rule_resource):
+            effect = rule_effect
+    if effect != expected:
+        raise SelfTestError(f"permission {action} returned {effect!r}, expected {expected!r}")
+    reporter.ok(f"permission {action} is {expected}")
+
+
+def wait_for(description, probe):
+    last_error = None
+    for _attempt in range(100):
+        try:
+            result = probe()
+            if result is not None:
+                return result
+        except SelfTestError as error:
+            if isinstance(error, DeadlineExceeded) or CANCELLED_SIGNAL is not None:
+                raise
+            last_error = error
+        time.sleep(0.1)
+    detail = f": {last_error}" if last_error else ""
+    raise SelfTestError(f"timed out waiting for {description}{detail}")
+
+
+def exercise_policy(client, expected_version, mcp_enabled, native_mcp_enabled, reporter, lsp_enabled=False, external_mcp_names=()):
+    def authentication_boundary():
+        client.request("/api/info", expected=401, authenticated=False, decode=False)
+        return True
+
+    wait_for("V2 authentication boundary", authentication_boundary)
+    reporter.ok("V2 server rejects unauthenticated requests")
+
+    health = wait_for("authenticated V2 info", lambda: client.request("/api/info"))
+    if not isinstance(health, dict) or health.get("version") != expected_version:
+        raise SelfTestError("authenticated V2 health response does not match the certified version")
+    reporter.ok(f"authenticated V2 health reports {expected_version}")
+
+    def active_plugin_ids():
+        plugins = data_field(client.request("/api/plugin"), "plugin list")
+        if not isinstance(plugins, list):
+            raise SelfTestError("plugin list data is not an array")
+        active = {
+            plugin.get("id")
+            for plugin in plugins
+            if isinstance(plugin, dict)
+            and isinstance(plugin.get("state"), dict)
+            and plugin["state"].get("status") == "active"
+        }
+        if not {"homeassistant.runtime-guard", "homeassistant.context"}.issubset(active):
+            return None
+        if mcp_enabled and "homeassistant.mcp" not in active:
+            return None
+        if lsp_enabled and "homeassistant.lsp" not in active:
+            return None
+        return active
+
+    active_plugins = wait_for("Home Assistant V2 runtime guard", active_plugin_ids)
+    reporter.ok("Home Assistant V2 runtime guard and context plugin are active")
+    if lsp_enabled:
+        reporter.ok("Home Assistant V2 LSP bridge plugin is active")
+    elif "homeassistant.lsp" in active_plugins:
+        raise SelfTestError("Home Assistant V2 LSP bridge is active while disabled by configuration")
+    else:
+        reporter.skip("Home Assistant V2 LSP bridge is disabled by configuration")
+    if mcp_enabled:
+        reporter.ok("Home Assistant V2 MCP plugin is active")
+    elif "homeassistant.mcp" in active_plugins:
+        raise SelfTestError("Home Assistant V2 MCP plugin is active while disabled by configuration")
+    else:
+        reporter.skip("Home Assistant V2 MCP plugin is disabled by configuration")
+
+    def connected_mcp_servers():
+        servers = data_field(client.request("/api/mcp"), "MCP server list")
+        if not isinstance(servers, list):
+            raise SelfTestError("MCP server list data is not an array")
+        statuses = {
+            item.get("name"): item.get("status", {}).get("status")
+            for item in servers
+            if isinstance(item, dict) and isinstance(item.get("status"), dict)
+        }
+        if mcp_enabled and statuses.get("homeassistant") != "connected":
+            return None
+        if native_mcp_enabled and statuses.get("homeassistant_native") != "connected":
+            return None
+        if any(statuses.get(name) != "connected" for name in external_mcp_names):
+            return None
+        return statuses
+
+    mcp_servers = wait_for("configured V2 MCP servers", connected_mcp_servers)
+    if mcp_enabled:
+        reporter.ok("Home Assistant V2 MCP server is connected")
+    if native_mcp_enabled:
+        reporter.ok("Native Home Assistant V2 MCP server is connected")
+    elif "homeassistant_native" in mcp_servers:
+        raise SelfTestError("Native Home Assistant V2 MCP server is present while disabled by configuration")
+    else:
+        reporter.skip("Native Home Assistant V2 MCP server is disabled by configuration")
+    if external_mcp_names:
+        reporter.ok(f"{len(external_mcp_names)} configured external MCP server(s) are connected")
+    else:
+        reporter.skip("No external MCP servers are enabled by configuration")
+
+    def read_only_agent():
+        agent = data_field(client.request(f"/api/agent/{READ_ONLY_AGENT}"), "read-only agent")
+        if isinstance(agent, dict) and agent.get("id") == READ_ONLY_AGENT and agent.get("mode") == "primary":
+            return agent
+        return None
+
+    agent = wait_for("V2 read-only agent", read_only_agent)
+    reporter.ok("V2 read-only agent is selectable")
+    rules = agent.get("permissions")
+    if not isinstance(rules, list) or not rules:
+        raise SelfTestError("read-only agent omitted its active permission rules")
+
+    denied_actions = (
+        "edit",
+        "shell",
+        "subagent",
+        "lsp",
+        "grep",
+        "future_native_action",
+        "homeassistant_call_service",
+        "homeassistant_write_config_safe",
+        "homeassistant_remember_decision",
+        "homeassistant_future_mutation",
+        "homeassistant_native_HassTurnOn",
+    )
+    for action in denied_actions:
+        assert_permission(rules, action, "*", "deny", reporter)
+
+    allowed = (
+        ("read", "/homeassistant/configuration.yaml"),
+        ("glob", "**/*.yaml"),
+        ("external_directory", "/homeassistant/configuration.yaml"),
+        ("homeassistant_get_states", "*"),
+    )
+    for action, resource_name in allowed:
+        assert_permission(rules, action, resource_name, "allow", reporter)
+
+    sensitive_paths = (
+        "/homeassistant/secrets.yaml",
+        "/homeassistant/.storage/core.config",
+        "/homeassistant/.cloud/account",
+        "/homeassistant/ssl/certificate",
+        "/homeassistant/private.key",
+        "/homeassistant/private.pem",
+    )
+    for sensitive_path in sensitive_paths:
+        assert_permission(rules, "read", sensitive_path, "deny", reporter)
+    reporter.ok("policy validation created no model session or pending approval")
+
+
+def main():
+    global CANCELLED_SIGNAL
+    arguments = sys.argv[1:]
+    if arguments not in ([], ["--quiet"]):
+        print("usage: opencode-v2-self-test [--quiet]", file=sys.stderr)
+        return 2
+    reporter = Reporter(arguments == ["--quiet"])
+
+    def cancel(signum, _frame):
+        global CANCELLED_SIGNAL
+        CANCELLED_SIGNAL = signum
+
+    def deadline(_signum, _frame):
+        raise DeadlineExceeded("V2 self-test exceeded its deadline")
+
+    signal.signal(signal.SIGTERM, cancel)
+    signal.signal(signal.SIGINT, cancel)
+    signal.signal(signal.SIGALRM, deadline)
+    signal.alarm(SELF_TEST_DEADLINE_SECONDS)
+    try:
+        if os.geteuid() != 0:
+            raise SelfTestError("V2 self-test must run as root")
+        harden_process(reporter)
+        runtime_root = os.environ.get("OPENCODE_V2_SELF_TEST_RUNTIME_ROOT", DEFAULT_RUNTIME_ROOT)
+        base_url = validate_base_url(os.environ.get("OPENCODE_V2_SELF_TEST_BASE_URL", DEFAULT_BASE_URL))
+        password, mcp_enabled, native_mcp_enabled, lsp_enabled, external_mcp_names = read_runtime_material(runtime_root, reporter)
+        with open("/usr/local/share/opencode-v2-certified-version", "r", encoding="utf-8") as version_file:
+            expected_version = version_file.read(128).strip()
+        if not expected_version:
+            raise SelfTestError("certified V2 version is unavailable")
+        exercise_policy(
+            ApiClient(base_url, password),
+            expected_version,
+            mcp_enabled,
+            native_mcp_enabled,
+            reporter,
+            lsp_enabled=lsp_enabled,
+            external_mcp_names=external_mcp_names,
+        )
+    except (SelfTestError, OSError, KeyboardInterrupt) as error:
+        print(f"V2 self-test failed: {error}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        print(f"V2 self-test failed with internal {type(error).__name__}", file=sys.stderr)
+        return 1
+    finally:
+        signal.alarm(0)
+    suffix = f", {reporter.skipped} skipped" if reporter.skipped else ""
+    print(f"V2 authenticated policy self-test passed ({reporter.passed} checks{suffix})")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

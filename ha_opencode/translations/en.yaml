@@ -1,0 +1,162 @@
+---
+# Field order here is cosmetic — the Home Assistant Configuration tab renders
+# fields in the order of the schema block in config.yaml. This file is kept in
+# that same order so the two stay easy to diff.
+#
+# House style for these strings:
+#   - Sentence case labels; no "Enable" prefix (a toggle already means that).
+#   - The subject is always "OpenCode", never "the AI" or "the model".
+#   - State a dependency in the first sentence, naming the option it depends on.
+#   - Two sentences where possible, three at most.
+#   - No restart instructions (every option needs one) and no changelog voice.
+configuration:
+  interface_mode:
+    name: "Interface"
+    description: "Choose the terminal or pinned OpenChamber V2 web preview. Both use the same managed V2 backend and session history."
+
+  terminal_theme:
+    name: "Terminal theme"
+    description: "Color scheme for the terminal. All ten themes are previewed in the Documentation tab. Applies to the terminal interface only."
+
+  font_size:
+    name: "Font size"
+    description: "Font size in pixels. Larger values are easier to read, smaller values fit more on screen. Applies to the terminal interface only."
+
+  cursor_style:
+    name: "Cursor style"
+    description: "Shape of the cursor: block, underline, or bar. Applies to the terminal interface only."
+
+  cursor_blink:
+    name: "Cursor blinking"
+    description: "Blink the cursor instead of showing it solid. Applies to the terminal interface only."
+
+  focus_mode:
+    name: "Focus-friendly responses (beta)"
+    description: "Ask OpenCode for action-first, concise, progress-aware replies that are quicker to scan and act on. Changes response wording only — it does not change permissions or safety confirmations."
+
+  mcp_enabled:
+    name: "MCP integration"
+    description: "Let OpenCode query your entities and call services through its built-in Model Context Protocol (MCP) server, so you can ask it to turn on the living room lights or check the bedroom temperature."
+
+  mcp_tool_profile:
+    name: "MCP tool profile"
+    description: "Controls which built-in Home Assistant MCP tools OpenCode receives. 'compact' is read-only diagnostics, 'configuration' adds documentation, validation and safe config writes, and 'full' keeps every existing tool including control and administration. A smaller profile reduces prompt size and tool-selection ambiguity, especially for local models."
+
+  lsp_enabled:
+    name: "LSP integration"
+    description: "Give OpenCode live diagnostics, entity and service auto-completion, and validation while it edits Home Assistant YAML, through the Language Server Protocol (LSP)."
+
+  screenshot_enabled:
+    name: "Screenshot tool"
+    description: "Requires the Home Assistant access token below, and a model that accepts image input - many fast models cannot see pictures at all. Lets OpenCode photograph Home Assistant pages in a headless browser to check the result of dashboard changes; each capture takes about 5-10 seconds."
+
+  access_token:
+    name: "Home Assistant access token"
+    description: "Long-lived access token for talking to Home Assistant Core directly. Required by the screenshot tool above and by the ESPHome commands — leave empty if you use neither. Create one in Home Assistant under Profile → Long-lived access tokens."
+
+  native_ha_mcp_enabled:
+    name: "Native Home Assistant MCP bridge (beta)"
+    description: "Adds a second MCP server that proxies to Home Assistant Core's own native LLM MCP endpoint. Requires the MCP Server integration to be set up in Home Assistant first. The keyed /api/mcp/<API ID> endpoints and the native LLM tool platforms first ship in Home Assistant 2026.8; on earlier versions the bridge falls back to the configured /api/mcp endpoint. This complements the MCP integration above rather than replacing it; leave it off unless you are testing Home Assistant's native LLM platform."
+
+  native_ha_mcp_api_id:
+    name: "Native MCP API ID"
+    description: "Applies only when the native bridge above is on. The default 'assist' targets /api/mcp/assist; leave it empty to use every LLM API selected in the MCP Server integration. Any registered API ID is reachable from here: Home Assistant requires admin access for keyed IDs other than 'assist', and the Supervisor calls Home Assistant Core as its own admin system user."
+
+  ha_assist_enabled:
+    name: Native Assist and AI data tasks (experimental)
+    description: Install the bundled OpenCode Assist companion and enable its scoped adapter. Restart Home Assistant after installation or updates, then configure the discovered OpenCode Assist integration in Settings → Devices & services. Manual or edited integrations are preserved and reported as conflicts; disabling keeps installed files. Requires HA 2026.10; model usage may incur provider charges.
+  ha_mcp_server_enabled:
+    name: "Expose read-only MCP to Home Assistant"
+    description: "Enable and restart, then confirm the discovered MCP integration in Home Assistant (app discovery targets Core 2026.10). HTTP and HTTPS work; no credentials are needed for new setups. Allows installation-wide state, device, area and calendar reads from the HA host network, including other host-network apps, not just Assist-exposed entities. No control/coding tools or host ports. Existing OAuth setups remain authenticated; independent of OpenCode's own MCP settings."
+
+  home_briefing_enabled:
+    name: "Install briefing"
+    description: "Give OpenCode a short summary of this installation — Home Assistant version, areas, entity counts per domain, and how your configuration files are split up — so it does not rediscover them in every session. The summary is rebuilt from scratch on every start and capped at roughly 500 tokens, so it cannot grow over time. Run 'ha-context show' in the terminal to read exactly what is sent."
+
+  decision_notes_enabled:
+    name: "Decision notes"
+    description: "Let OpenCode carry lasting decisions between sessions — an integration you removed on purpose, a file it should leave alone — instead of re-deciding them each time. Nothing is recorded without your explicit approval, and the notes are plain YAML in /config/opencode/decisions.yaml that you can read, edit, or delete."
+
+  restrict_sensitive_files:
+    name: "Restrict access to sensitive files"
+    description: "Denies OpenCode read access to secrets.yaml, the .storage and .cloud directories, the ssl folder, and any .key or .pem file, so their contents cannot be sent to the model. Everything else stays readable, and OpenCode can still edit config that references secrets with !secret. This covers OpenCode's file read and edit tools, not shell commands."
+
+  addon_access_enabled:
+    name: "Add-on folder guidance"
+    description: "Shows guidance for working in the mounted /addons and /addon_configs folders. Both are mounted whatever this is set to, and /addon_configs may hold other add-ons' credentials — this is guidance, not a filesystem permission boundary."
+
+  cpu_mode:
+    name: "CPU mode"
+    description: "Which OpenCode binary to run. 'auto' detects your CPU (recommended), 'baseline' selects the build meant for older CPUs without AVX2, and 'regular' forces the standard build. OpenCode requires a CPU with SSE4.2 (Intel Nehalem 2008+, AMD Bulldozer 2011+) in every mode. Note that upstream currently ships the same binary in both packages, so 'baseline' does not presently help a CPU without AVX2."
+
+  enable_server:
+    name: "OpenCode LAN server"
+    description: "Opens an authenticated frontend on 4096 to the existing managed V2 backend. Requires LAN password, public HTTPS URL and trusted reverse-proxy IPs. Map the port only for that proxy."
+
+  lan_password:
+    name: "LAN password"
+    description: "Separate 16–256 character administrator password for LAN API access (username opencode) and native OpenChamber login. Configure privately here, not in chat. Restart the app to apply changes and revoke existing connections/logins."
+
+  lan_trusted_proxies:
+    name: "LAN trusted proxy IPs"
+    description: "Exact IPs of your nearest HTTPS reverse proxy, as seen by the app. No wildcards or CIDRs. The proxy must preserve Host and overwrite X-Forwarded-Proto and X-Forwarded-For; see Documentation."
+
+  server_public_url:
+    name: "OpenCode public HTTPS origin"
+    description: "External HTTPS origin for the API frontend, for example https://code.example.com. No path. Required when the LAN server is enabled."
+
+  openchamber_public_url:
+    name: "OpenChamber public HTTPS origin"
+    description: "External HTTPS origin for the web frontend, for example https://chat.example.com. No path. Required when OpenChamber LAN is enabled."
+
+  cors_origins:
+    name: "LAN server CORS origins"
+    description: "Additional exact HTTPS browser origins allowed to call the authenticated LAN API. No wildcards. Empty allows only the API's own origin; non-browser authenticated clients do not need an entry."
+
+  openchamber_lan_native_apps:
+  openchamber_relay_host:
+    name: "OpenChamber relay hosting"
+    description: "Lets the managed OpenChamber instance host the pairing relay so relay-paired devices stay usable after restarts and updates. Keeps an outbound connection to OpenChamber's relay service (relay.openchamber.dev). Off by default."
+
+    name: "OpenChamber LAN native apps"
+    description: "Lets the OpenChamber desktop and mobile apps sign in to the OpenChamber LAN UI through your HTTPS proxy. Allows only OpenChamber's packaged app origins; browsers still need the public origin. Requires OpenChamber LAN web UI."
+
+  ppq_private_enabled:
+    name: "PPQ private TEE models (beta)"
+    description: "Starts the internal proxy and registers native ppq-private models when a key is configured. Select a private model explicitly; this does not switch existing sessions or verify upstream private inference."
+
+  ppq_api_key:
+    name: "PPQ API key"
+    description: "API key for PPQ private-mode models. Stored as a masked add-on option and exported only to the internal PPQ proxy. Leave empty unless the option above is on."
+
+  z2m_url:
+    name: "Zigbee2MQTT URL"
+    description: "Address of your Zigbee2MQTT frontend, used by zigporter commands such as 'list-z2m' and 'network-map'. Only needed when the Zigbee2MQTT add-on is not discovered automatically — use the same address and port you open its UI on. Include http:// or https://; a bare host or IP is treated as http://."
+
+  z2m_mqtt_topic:
+    name: "Zigbee2MQTT base topic"
+    description: "MQTT base topic that Zigbee2MQTT publishes on. Change this only if you changed it in Zigbee2MQTT itself; the default is 'zigbee2mqtt'."
+
+  serial_devices:
+    name: "Serial devices"
+    description: "Host serial/UART devices to map into the add-on, for work that needs direct serial access such as local USB flashing or adapter inspection. Nothing is mapped unless you add a device here, for example /dev/ttyUSB0 or a /dev/serial/by-id/... path."
+
+  enable_openchamber_lan:
+    name: "OpenChamber LAN web UI"
+    description: "Opens the native password-protected OpenChamber UI on 4097 behind your trusted HTTPS proxy. Requires OpenChamber interface mode and LAN settings. The same native login also applies through Ingress while enabled."
+
+  env_vars:
+    name: "Environment variables"
+    description: "The V2 backend accepts non-reserved provider *_API_KEY variables such as OPENAI_API_KEY. Other variables have separate shell/service handling and produce a backend warning. Critical system and HA credential variables cannot be overridden. Provider keys are not isolated from backend subprocesses; configure them privately, not in chat."
+
+  opencode_config:
+    name: "Custom OpenCode configuration"
+    description: "V2 JSON subset: model, default_agent, providers, boolean formatter, compaction, media, tool_output and websearch. Supported legacy provider entries are converted in memory; see Documentation for limits. Invalid fields stop activation until corrected; saved options are preserved. Managed permissions, plugins, runtime and integration policy cannot be overridden."
+
+  external_mcp_config:
+    name: "External MCP configuration"
+    description: "Validated JSON for external remote or local MCP servers and their ordered tool permissions. Protected headers use secret_file descriptors; local environment secrets use file references. Local executables must live directly in /data/.config/opencode/bin. See Documentation for the schema and examples."
+
+  user_hooks_enabled:
+    name: "Startup hooks (beta)"
+    description: "Runs your own .sh scripts from the 'startup.d' folder in this add-on's directory, once every time the add-on starts — the supported way to add a bridge, a small service or an extra tool without editing files inside the container. These scripts are yours: they run as root with access to the Home Assistant API, and the add-on does not check, supervise or restart them. Anything that can write to your configuration folder can therefore run code here, so leave this off unless you want it. Turn it on, restart, then run 'ha-hooks list' in the terminal; the folder is created with a README and a worked example."

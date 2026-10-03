@@ -1,0 +1,813 @@
+# Changelog
+All notable changes to this project will be documented in this file.
+
+## [Unreleased]
+
+- OpenChamber Relay: option `openchamber_relay_host` to host the pairing relay passively on the managed instance, so relay-paired devices survive restarts and updates (see `ha_opencode/DOCS.md` 'OpenChamber Relay Hosting'). Fixes #151.
+- Promote beta 3.2.0b8 to stable with hab 1.7.2 native compact discovery, verified dashboard patches and opt-in experimental Assist integration.
+
+## 3.2.0
+
+- Promote the 3.2 beta series with OpenCode CLI/plugin **2.0.22**, OpenChamber **2.1.0** and hab **1.7.2**, pinned to exact release sources. Existing stable conversations, sign-ins and settings are preserved during the validated state upgrade.
+- Use hab's native compact schemas and searchable, paginated command index while preserving payload/output contracts and schema identities. Structured arguments avoid quoting errors; complete large results are retained within the output bound.
+- Prefer field-level dashboard patches with real preview diffs, revision checks, no-op detection and stored-configuration verification. Preserve unrelated fields and report conflicts, rejections and uncertain saves without automatic write retries; rendering still needs a visual check.
+- Improve Home Assistant native LLM API discovery and prompt/context forwarding while preserving modern tool schemas, metadata and read-only restrictions.
+- Add opt-in **experimental OpenCode Assist** conversations and AI data tasks for **HA 2026.10 with Supervisor**, with bundled companion **0.1.0b7**, automatic discovery/pairing, independent model settings and one entity of each type per app connection ([#45](https://github.com/magnusoverli/opencode/issues/45)).
+- To use Assist, enable `ha_assist_enabled`, restart the app, then restart **Home Assistant Core** and configure the discovered integration. Select APIs explicitly; voice also needs separately configured speech engines. Manual, edited or beta-managed companion installations are preserved and need the documented ownership-switch steps. Full supervised voice-pipeline and crash-recovery qualification remain open; HA still displays Add buttons after configuration, with duplicate creation blocked.
+- Fix LM Studio HTTP 400 errors for parameterless MCP tools ([#149](https://github.com/magnusoverli/opencode/issues/149)); thanks @AceMoneus for the detailed reproduction.
+- Document keyless Lemonade Server setup and compact MCP guidance; thanks @soulafein83 for suggesting it in [#147](https://github.com/magnusoverli/opencode/issues/147).
+- Expand the README's community contributor credits.
+
+- Patch `brace-expansion` (CVE-2026-102276) within each minimatch major's own compatible range instead of a blanket override, since forcing minimatch 9's dependency chain onto brace-expansion 5.x broke its CommonJS interop.
+
+## 3.1.0
+
+- Restore supported V1 OpenAI-compatible provider settings through validated, in-memory V2 conversion; thanks @nomonkeynodeal for reporting [#141](https://github.com/magnusoverli/opencode/issues/141).
+- Explain configuration failures directly in the terminal before the resulting sidecar warning; thanks @smw6180, @Sebazzz and @MechaMtt for reporting [#139](https://github.com/magnusoverli/opencode/issues/139).
+- Add opt-in `openchamber_lan_native_apps` for native OpenChamber login through the HTTPS LAN frontend, with authenticated token/CORS/stream coverage; thanks @Rahulsharma0810 for reporting [#135](https://github.com/magnusoverli/opencode/issues/135) and contributing [#136](https://github.com/magnusoverli/opencode/pull/136).
+- Identify the exact `/homeassistant` mount/ownership failure at pre-init without changing files; thanks @arretx and @bbo76 for reporting [#138](https://github.com/magnusoverli/opencode/issues/138), whose underlying mount issue still needs affected-host evidence.
+- Clarify MCP migration, history-picker limits, custom-agent availability, V2 client health and screenshot paste; thanks @horve000, @BBungalow, @SolutechUK, @naspinec and @AngeloAna for the reports ([#129](https://github.com/magnusoverli/opencode/issues/129), [#134](https://github.com/magnusoverli/opencode/issues/134), [#140](https://github.com/magnusoverli/opencode/issues/140), [#142](https://github.com/magnusoverli/opencode/issues/142), [#143](https://github.com/magnusoverli/opencode/issues/143)); remaining implementation/design questions stay open.
+
+## 3.0.10
+
+- Explain first-boot migration progress and temporary Ingress 502s while large histories convert, so users know when startup finishes without restarting ([#130](https://github.com/magnusoverli/opencode/issues/130)).
+
+## 3.0.9
+
+- Add a bounded `external_mcp_config` option for remote and local MCP servers. Credentials stay in secured root-owned files, local processes run unprivileged with only their declared environment, external tools default to confirmation, and optional ordered tool rules are translated to native V2 permissions. Thanks to [@mabratland](https://github.com/mabratland) for contributing this feature ([#131](https://github.com/magnusoverli/opencode/pull/131)).
+
+## 3.0.8
+
+- Allow guarded V1-to-V2 migration of databases up to 32 GiB and log size-only storage preflight figures to diagnose startup failures ([#130](https://github.com/magnusoverli/opencode/issues/130)).
+
+## 3.0.7
+
+- Restore device and entity room assignments in OpenChamber via approved Home Assistant registry tools in the full profile ([#132](https://github.com/magnusoverli/opencode/issues/132)).
+
+## 3.0.6
+
+- **Keep complete large hab results for safe dashboard edits ([#128](https://github.com/magnusoverli/opencode/issues/128))** — when `hab_run` exceeds its 20,000-character inline limit, its response now includes `meta.full_output_path` for the entire result in a private, temporary runtime file. The preview stays bounded; agents can transform the complete dashboard locally instead of saving a reconstruction with missing content. Old exports are pruned on subsequent exports or cleared at container restart.
+
+## 3.0.5
+
+- **Fix OpenAI browser sign-in in OpenChamber** — bridge OpenCode V2's localhost OAuth callback through an Ingress handoff page. After OpenAI redirects to an unreachable `localhost` URL, paste that full URL into the handoff page to deliver the callback inside the add-on; OpenChamber then completes its normal sign-in polling. The callback URL and authorization code are not written to logs.
+
+## 3.0.4
+
+- **Restore stable decision-note access ([#126](https://github.com/magnusoverli/opencode/issues/126))** — run the stable Home Assistant MCP sidecar with the stable channel and `/homeassistant/opencode` decision-notes directory. Stable `recall_decisions` and `remember_decision` now use the same notes as the stable session briefing; beta's separate notes remain untouched.
+
+## 3.0.3
+
+- **Correct backup copy counts ([#123](https://github.com/magnusoverli/opencode/issues/123))** — `get_backup_posture` counts Home Assistant backup agents so a local-plus-cloud backup reports both copies. When the Core agent inventory is unavailable, the count is unknown instead of an undercount; storage locations remain omitted.
+- **Fix safe-write template false positives ([#124](https://github.com/magnusoverli/opencode/issues/124))** — validate complete YAML template scalars rather than isolated Jinja tags, skip unchanged templates from the existing file, and avoid rejecting new templates that require automation runtime variables to render. Changed template syntax errors still block writes, and Home Assistant's full config check still runs after a write.
+
+## 3.0.2
+
+- **Fix V1-to-V2 conversation migration ([#122](https://github.com/magnusoverli/opencode/issues/122))** — calculate the session cost total with the same sequential floating-point addition as OpenCode V2. Python's newer `sum()` uses compensated addition and could falsely reject an otherwise intact conversation with `session_projection_mismatch (fields: cost)`. The exact aggregate and individual message checks remain in place; the original state is preserved if any other validation fails.
+
+## 3.0.1
+
+- **V2 upgrade recovery ([#122](https://github.com/magnusoverli/opencode/issues/122))** — corrected the session validator's ordering of equal-time messages with mixed-case IDs to match OpenCode V2's migration. This can prevent a false `session_projection_mismatch` when a session's agent or model is inferred from its latest user message.
+- If migration still cannot be validated, startup logs now identify the differing session *column names* without exposing their values, and the terminal shows a persistent explanation instead of `[exited]`. Existing V1 data remains intact for a retry or restoration from backup.
+
+## 3.0.0
+
+🥳 **OpenCode V2 has arrived!** A major upgrade for your Home Assistant assistant, with a refreshed OpenChamber experience and a shared backend that keeps your conversations together.
+
+### Highlights
+
+- **One backend, two interfaces:** the terminal and OpenChamber now share the same app-managed OpenCode V2 runtime and conversation history.
+- **A better web workspace:** refreshed OpenChamber, YAML completion and diagnostics, corrected Usage reporting, and last-used model selection for new chats.
+- **Stronger Home Assistant integration:** credential-isolated tools, reliable concurrent MCP sessions, native YAML formatting, and improved cancellation and update reporting.
+- **Secure optional LAN access:** separately authenticated frontends behind your trusted HTTPS reverse proxy.
+
+### Before upgrading
+
+- **Create a Home Assistant backup first.** Existing stable conversation history migrates on first startup; returning to V1 requires restoring your pre-upgrade backup.
+- **Sign in to providers again.** V1 browser/OAuth sign-ins are not imported; API keys configured in app options are handled separately.
+- **Review LAN and custom configuration settings.** LAN access now requires authentication and HTTPS-proxy settings. Unsupported custom configuration is rejected with an explanation.
+- Components update through **Home Assistant Supervisor**. Beta and stable retain separate histories and sign-ins; installing stable does not import your beta data.
+- The V1 browser-terminal quit overlay is retired; use the terminal's own exit action.
+
+See the [upgrade guide](https://github.com/magnusoverli/opencode/blob/v3.0.0/ha_opencode/DOCS.md#upgrading-from-2x) for migration, recovery and current limitations, including custom-skill discovery.
+
+## 2.5.6
+
+- Fixed screenshot authentication and now report login, navigation, or frontend-readiness failures instead of successful dashboard captures (#121).
+- Devcontainer builds now tolerate Windows line endings in build metadata.
+
+## 2.5.5
+
+- **Quit OpenCode from the browser terminal (#113)** — added a compact top-right quit button using the existing ttyd page injection. It requests the managed terminal instance's graceful exit, returns to the shell, and leaves tab-disconnect persistence and independent servers intact. Exit requests are Ingress-only, bound to the displayed instance, and never escalate to a force-kill. Verified through real Home Assistant Core Ingress in the official devcontainer, including active MCP/LSP cleanup, saved-conversation recovery, shared terminals, customized bindings, and emulated mobile touch.
+
+- **Clearer automation editing workflow (#115)** — aligned agent guidance around safe YAML writes, approved domain reloads, and read-only load verification. Successful safe writes now give file-specific apply guidance and distinguish saved changes from active configuration; reduced tool profiles explicitly leave reload pending.
+
+## 2.5.4
+
+- Pinned OpenCode to 1.18.29, including fixes for GPT-6 model discovery with OpenAI subscription authentication.
+- Removed the injected Home Assistant MCP status badge and its unused UI plumbing; automatic discovery and existing OAuth access are unchanged.
+- Added opt-in read-only MCP tools with automatic trusted-host discovery, HTTP/HTTPS support, and no manual credentials for new setups; existing OAuth access is preserved.
+- Made the official Home Assistant Supervisor devcontainer the default workflow and added repeatable app, s6, smoke-test, and Home Assistant Core Ingress acceptance.
+- Standardized the container runtime on Node 24.15.0 while retaining Home Assistant's Supervisor-compatible Debian base.
+- Fixed the read-only session prompt normalization so the in-add-on smoke test no longer reports a false failure.
+
+## 2.5.3
+
+- **Certified OpenCode 1.18.25** — adds Azure/Microsoft Entra ID authentication through Azure CLI without an API key or Bun, and V1 support for compatible V2 configuration fields.
+- **Provider and sign-in reliability** — fixes Cloudflare AI Gateway/Anthropic routing, OpenAI-compatible `textVerbosity`, device-login links behind a base path, immutable-token GitHub authentication, and Amazon Bedrock reasoning-message caching.
+- **OpenChamber 1.21.0** — updated the web UI and verified its Home Assistant Ingress patch, including the proxy-served runtime shim; unsupported in-app runtime-update notifications remain disabled.
+- **ESPHome Device Builder 1.12 support** — added migration planning, structured connectivity and crash troubleshooting, terminal stream completion, and the current Device Builder protocol.
+- **Current Home Assistant compatibility** — updated Supervisor volume map types to remove legacy-schema warnings.
+
+## 2.5.2
+
+- **Reliable interrupted-stream recovery ([issue #104](https://github.com/magnusoverli/opencode/issues/104))** — updated the certified OpenCode runtime to 1.18.21, which continues a response after an upstream provider reports an unknown finish reason instead of silently stopping the session.
+
+## 2.5.1
+
+- Git remotes using SSH now work out of the box with the bundled OpenSSH client tools.
+- Documented the persistent `/config/.opencode` locations for user-owned skills and agents, including editor access and restart behavior.
+- ESPHome agents can now read, validate, create, and safely update Device Builder YAML through its native WebSocket API, with preview-first writes, stale-source checks, and post-write verification.
+- ESPHome management now covers device lifecycle, adoption, board and metadata discovery, YAML search and includes, write-only secret/key workflows, version history, bounded logs, managed firmware jobs, build cleanup, serial provisioning, and remote-build pairing.
+
+## 2.5.0
+
+- **Certified OpenCode runtime** — the add-on now runs the tested OpenCode 1.18.16 build shipped in its image. The rolling update policy and background npm installer are removed; runtime upgrades now arrive through add-on releases after beta validation.
+- **Home Assistant guidance on demand** — detailed configuration, troubleshooting, dashboard, Zigbee/ESPHome, and development procedures now load as five task-specific skills instead of occupying every request. User-edited skill copies are preserved across updates.
+- **Safer investigations and clearer diagnostics** — `ha-readonly` starts a terminal-only session that cannot change files or Home Assistant; `opencode-smoke-test` checks the bundled integration chain; and `ha-mcp tools` diagnoses local-model tool visibility ([issue #99](https://github.com/magnusoverli/opencode/issues/99)).
+- **OpenChamber 1.18.3 and reliability fixes** — updates the web UI through the latest release, abandoned streams no longer restart ingress ([issue #98](https://github.com/magnusoverli/opencode/issues/98)), and voice-model archives now extract correctly ([issue #100](https://github.com/magnusoverli/opencode/issues/100)).
+
+## 2.4.2
+
+The 2.4.2 beta cycle, promoted: a current OpenChamber web UI, resilient service supervision, safer timestamps, and clearer Home Assistant operations diagnostics.
+
+- **OpenChamber stays available after an add-on restart ([issue #95](https://github.com/magnusoverli/opencode/issues/95))** — the server and Home Assistant Ingress proxy are independently supervised, so restarting either cannot strand a port-holding orphan process on 3010 or 8099.
+- **OpenChamber 1.18.1 with working browser OAuth** — browser providers whose callback is container-local now show a paste-code flow, allowing the add-on to replay the failed localhost redirect inside the container instead of waiting for an unreachable browser callback.
+- **Firefox terminal sizing** — high-DPI Firefox sessions reconcile their pixel ratio with the rendered terminal canvas, restoring the full terminal width without affecting other browsers.
+- **Reliable Supervisor app discovery ([issue #90](https://github.com/magnusoverli/opencode/issues/90))** — update checks, app changelogs, ESPHome discovery, and startup service discovery prefer the feature-gated Supervisor V2 apps API while retaining V1 support.
+- **Supervisor operations diagnostics** — six read-only tools provide bounded health, Resolution, backup posture, support-log, store-audit, and metrics evidence without exposing sensitive configuration or log secrets.
+- **Unambiguous history timestamps ([issue #94](https://github.com/magnusoverli/opencode/issues/94))** — history, logbook, and calendar queries now require timestamps with `Z` or a UTC offset, preventing local-time interpretation from silently shifting requested windows.
+
+## 2.4.1
+
+- **Startup hooks ([issue #66](https://github.com/magnusoverli/opencode/issues/66))** — an opt-in, persistent `startup.d` folder is now the supported place for your own shell scripts that need to run at add-on startup. Hooks run as root in filename order; `ha-hooks list`, `ha-hooks run`, and `ha-hooks log` let you inspect and test them. They are off by default, are bounded against hangs and restart loops, and their credential-bearing logs are excluded from backups.
+- **LAN custom agents can write their allowed files ([issue #92](https://github.com/magnusoverli/opencode/issues/92))** — scoped absolute edit rules now work in headless server sessions, while unapproved writes are denied instead of hanging indefinitely.
+- **Sharper Home Assistant agent tools** — choose a compact, configuration, or full MCP tool profile to reduce irrelevant tool definitions; capability status now says whether the native MCP bridge is actually usable; and `ha-agent-eval` can score a real OpenAI-compatible model against safe synthetic tool-call scenarios without touching your Home Assistant instance.
+- **Smaller installed image** — production images no longer include unused platform binaries, development artifacts, build toolchains, or the standalone PPQ proxy's optional OpenClaw peer tree; runtime features are unchanged.
+
+## 2.4.0
+
+The 2.3.9 beta cycle, promoted. A native MCP bridge that finally meets the Home Assistant release it was written for, two Core log errors that made your logs lie about your setup, a class of services that could not be called at all, and a first pass at what every request costs you.
+
+- **The native Home Assistant MCP bridge works, on 2026.8 and before it** — Home Assistant's native LLM platform arrives in **2026.8**: the `llm` integration, the per-domain tool platforms, and the keyed `/api/mcp/<API ID>` endpoints all first ship there. The bridge was written against that platform before it existed and targeted `/api/mcp/assist` unconditionally, so on every shipping Home Assistant it hit a 404 and did nothing. It now prefers the keyed endpoint and falls back to the configured `/api/mcp` when the keyed one is not served, retrying periodically so upgrading Home Assistant under a running add-on is picked up on its own. Tool schemas that Home Assistant could not serve correctly before 2026.8 are repaired in transit ([home-assistant/core#176762](https://github.com/home-assistant/core/issues/176762)), and every message is validated as JSON-RPC 2.0 before being forwarded, because malformed POSTs to `/api/mcp` have been reported to crash Core ([#176734](https://github.com/home-assistant/core/issues/176734)) — that one is **not** fixed in 2026.8, so the guard applies on every version. `get_agent_capabilities` reports the minimum version, whether this instance meets it, and each upstream limitation against the release that fixes it, so a stalled bridge reads as a known upstream gap rather than a broken configuration. **Two one-time steps are required to use it:** add the **Model Context Protocol Server** integration in Home Assistant, then turn the bridge on and restart the add-on. See [Native Home Assistant MCP Bridge](DOCS.md#native-home-assistant-mcp-bridge-beta).
+- **Any registered LLM API is reachable, not just Assist** — Home Assistant requires admin access for keyed `/api/mcp/<API ID>` endpoints other than Assist, which reads as a wall for an add-on and is not one: the Supervisor calls Core as its own system user, which Home Assistant creates in the admin group. A custom LLM API from your own integration is testable over `/api/mcp/<your API ID>` with no token, and an unknown-API-ID error means the ID does not exist rather than that access was refused. Relatedly, `/api/mcp` serves **every** API selected in the MCP Server integration — that setting is a multi-select — so leaving the API ID empty gives you all of them.
+- **Services that answer with data now work through `call_service` ([issue #82](https://github.com/magnusoverli/opencode/issues/82), reported by [@GuiPoM](https://github.com/GuiPoM))** — `recorder.get_statistics`, `weather.get_forecasts`, `calendar.get_events`, `todo.get_items` and every other response-capable service were unreachable. Home Assistant requires `?return_response` for them, `call_service` never sent it, and its schema rejected the argument outright. The flag cannot simply always be sent — Home Assistant answers 400 in **both** directions — so it is now decided from Home Assistant's own service catalog, where a description carries a `response` key only when the service supports one. `get_services` marks which services answer with data, so the set is discoverable rather than guessed at.
+- **Two Core log errors, both reported with accurate root-cause analysis by [@JayMansel](https://github.com/JayMansel)** — the screenshot tool sent a second WebSocket authentication frame on every capture, logging `Received invalid command: {'type': 'auth', ...}` ([issue #74](https://github.com/magnusoverli/opencode/issues/74)); the frontend now owns authentication and the interceptor is a genuine fallback. The YAML language server called a Jinja global that does not exist, logging `Template variable error: 'devices' is undefined` and never offering device ID completions ([issue #75](https://github.com/magnusoverli/opencode/issues/75)); the device list is now derived from the entities in `states`. Neither broke the feature it belonged to, which is why both went unnoticed for so long.
+- **Direct file edits ask before writing ([issue #81](https://github.com/magnusoverli/opencode/issues/81))** — this add-on points an AI agent at a live Home Assistant installation, and until now a newly installed add-on would edit configuration files without confirming anything first. Editing a file now asks for approval, as do in-place shell edits (`yq -i`, `sed -i`, `tee`) and removing or renaming files. Read-only commands are unaffected. Writes through `write_config_safe` still do not prompt — they already validate, back up, and roll back. Both directions stay configurable through **Custom OpenCode config**.
+- **Less of your context spent on the add-on's own plumbing** — recording a decision no longer rewrites the system prompt mid-conversation (it was discarding the cached prefix, and the whole conversation with it); MCP tool responses are no longer pretty-printed, since indentation is whitespace only the model reads and is paid for again on every request it stays in history; and an undomained `get_states` is capped at 150 entities rather than 500. Together the last two take a 500-entity response from roughly 69,000 characters to about 15,500. Domain-filtered calls keep the 500 ceiling. This matters most on local models, where the whole prompt is re-read on your own hardware rather than absorbed by a provider's cache.
+- **A CPU too old for OpenCode says so instead of crashing ([issue #86](https://github.com/magnusoverli/opencode/issues/86), reported by [@deanhalllincoln](https://github.com/deanhalllincoln))** — `opencode --version` died with `Illegal instruction (core dumped)` and nothing explained why. OpenCode ships as a Bun-compiled binary, so Bun's CPU floor is OpenCode's: even the x64 *baseline* build requires SSE4.2. The add-on now checks for it at start-up and names the CPU and the requirement in the log. Note that the `baseline` CPU mode does not currently do what it promised — upstream is publishing the AVX2 binary inside that package ([anomalyco/opencode#33595](https://github.com/anomalyco/opencode/issues/33595)) — so machines with SSE4.2 but no AVX2 hit the same fault the option exists to avoid. The option is kept rather than removed, because it starts working the moment upstream publishes a genuine baseline build. Minimum hardware is now documented up front.
+- **The beta add-on no longer writes over this one** — if you run both channels, they shared your configuration directory and interfered in three ways: decision notes were written to the same file, so a note recorded while trying something in beta was injected into every stable session afterwards; both deployed `AGENTS.md`, and only one file there can carry the name OpenCode looks for, so whichever started last owned it — and beta's copy tells the model things that are true of beta's build and false of this one; and each recorded "this is the copy I wrote" in its own private `/data`, so each kept concluding *you* had hand-edited the other's file and stopped updating it. This add-on now owns `AGENTS.md` outright and keeps its ownership marker beside the file, which also means reinstalling no longer looks like a hand edit.
+
+## 2.3.8
+
+Home context, promoted from the 2.3.8 beta cycle: OpenCode now starts each session already knowing what your installation looks like and why it is the way it is, instead of rediscovering both from scratch every time.
+
+- **Sessions start knowing your installation ([issue #63](https://github.com/magnusoverli/opencode/issues/63))** — a compact install briefing describing your areas, integrations, configuration layout and add-on capabilities is generated once and refreshed on demand, so the first question of a session no longer has to be spent on discovery. Where the briefing cannot fit everything, it names what it left out rather than staying silent, so a gap in OpenCode's context can never read as an absence in your setup.
+- **Your own instructions survive add-on updates** — rules you write now live in `AGENTS.local.md`, which the add-on never overwrites. The previous guidance pointed at `/config/AGENTS.md`, which was replaced on every update; the one-time migration backs up an existing file rather than clobbering it.
+- **Decision notes carry reasoning between sessions** — your YAML records what your setup does but not *why*, so a deliberate choice looks identical to an oversight and gets "fixed". Notes are recorded only with your explicit approval, are screened for credentials both when written and when read back, are dated by your local clock, and can be pinned so the constraints that matter most are the last to be dropped. Three MCP tools (`remember_decision`, `recall_decisions`, `supersede_decision`) and a new `ha-context` command manage them; recall matches a plain question rather than a single substring, and an empty result says how many notes exist instead of implying nothing was ever decided.
+- **Screenshot tool fixes ([issue #72](https://github.com/magnusoverli/opencode/issues/72))** — it reported "captured successfully" while writing nothing to disk, so models advised users to go and find a file that did not exist; the PNG only ever exists inside the tool result, and the tool now says so. The add-on's own vision model for PPQ private mode could not receive images at all because its `modalities` field was missing, the 10-second MCP call deadline could cut a screenshot off on slower hardware (now 60), and the tool is now hidden unless the feature is on and an access token is set. Whether a screenshot is usable still depends on the model you select — the documentation and option description now say so.
+
+Both channels are now built from separate branches: stable from `main`, beta from `dev`. See [RELEASING.md](../RELEASING.md).
+
+## 2.3.7
+
+- **Optional OpenChamber LAN web UI** — a new `enable_openchamber_lan` option (only active when `interface_mode: openchamber`) publishes the OpenChamber UI on a mappable network port (`4097/tcp`), mirroring the existing OpenCode LAN server on `4096/tcp`. It runs a second instance of the ingress proxy bound to `0.0.0.0` with the remote-address allowlist relaxed (via `OPENCHAMBER_ALLOW_ANY_REMOTE`) and serves the UI at the root path `/`, so reverse proxies and tunnels (e.g. Cloudflare Tunnel) can point straight at a backend without an ingress-path redirect/rewrite. Off by default; requires both enabling the option and mapping `4097/tcp` in Network settings. No Home Assistant Ingress auth sits in front of the mapped port, so it is intended for trusted networks or behind a reverse proxy / access control.
+- **Configuration page promoted from beta** — reorganized the Configuration tab into clear presentation, Home Assistant integration, access-control, runtime, network, provider, hardware, and advanced groups; aligned labels and descriptions with the actual option order; and promoted the opt-in focus-friendly responses, native Home Assistant MCP bridge, and LAN CORS settings while keeping experimental features explicitly marked beta.
+
+## 2.3.6
+
+- **Browser provider sign-in no longer hangs on "Saving..." ([issue #54](https://github.com/magnusoverli/opencode/issues/54))** — connecting a provider from the OpenChamber UI with a browser OAuth method (for example **ChatGPT Pro/Plus (browser)**) never finished. OpenCode's browser methods start a callback listener on a loopback port *inside* the add-on container and send the browser to `http://localhost:<port>/auth/callback`; behind Home Assistant Ingress the browser runs on your own device, so that redirect lands nowhere and the pending sign-in request waits on the listener indefinitely — the pasted code is ignored for these methods. The ingress proxy now remembers the loopback redirect from the authorization step and replays it to the in-container listener when you paste the code, so the exchange completes and the provider is saved. Paste either the authorization code or the whole `http://localhost:...` URL your browser failed to open; the on-screen instructions now describe what actually happens instead of promising the window will close by itself. Providers that do not use a loopback callback are unaffected. Thanks to [@DennisSDUSA](https://github.com/DennisSDUSA) for the detailed report and to [@matrix2669](https://github.com/matrix2669) for the headless workaround.
+- **Quieter add-on log** — ttyd logged every accepted HTTP connection at libwebsockets NOTICE level, so the container health check (which probes `http://127.0.0.1:8099/` every 30 seconds) produced a repeating three-line burst — roughly 4,300 lines a day of noise that buried real messages. ttyd now runs at log level `ERR|WARN` (`-d 3`), so genuine errors and warnings still surface while the per-probe chatter is gone.
+- **Terminal now fits the Home Assistant iframe ([issue #56](https://github.com/magnusoverli/opencode/issues/56))** — the ingress terminal kept its initial oversized dimensions and overflowed on the right and top (for example, `Ctrl+P`'s "Session" header sat above the visible area), and toggling the HA sidebar did not reflow it. ttyd re-fits the terminal only from a window `resize` event, but Home Assistant resizes the add-on iframe from its own JavaScript without ever firing one. A small injected browser-side script now watches the viewport with a `ResizeObserver` and calls ttyd's `window.term.fit()` on the iframe-driven size changes that `resize` misses, so the terminal reflows to the available space on load and when the sidebar toggles. Thanks to [@fmjensen](https://github.com/fmjensen) for the detailed report and root-cause analysis.
+- **Home Assistant configuration access** — OpenCode now persistently allows the mounted `/homeassistant` configuration directory, so normal configuration work no longer asks for external-directory permission in every session while sensitive-file read protection remains in effect.
+- **Supervisor-safe Home Assistant logs ([issue #57](https://github.com/magnusoverli/opencode/issues/57))** — `ha-logs error` and the MCP `get_error_log` now fall back to Core journal logs when Supervisor disables the file-backed error-log endpoint. Thanks to [@GuiPoM](https://github.com/GuiPoM) for reporting it.
+- **Beta: optional focus-friendly response mode** — added action-first, concise, progress-aware response guidance that preserves Home Assistant approval and safety requirements. Inspired by [@ayghri's `i-have-adhd`](https://github.com/ayghri/i-have-adhd) response-style skill.
+- **OpenChamber updated to 1.16.2** — bumped the pinned `@openchamber/web` from 1.14.0 to the latest 1.16.2, and reworked the Home Assistant Ingress bundle patcher (`patch-ingress.js`) so it no longer breaks on OpenChamber's minified-name drift. The four required patches (runtime URL builder, API URL builder, API path classifier, service-worker) now match the bundle structurally and reuse the captured minifier names instead of hardcoding them, so the patch is validated to apply cleanly across 1.14.x through 1.16.2 and is more resilient to future version bumps. The bundle still binds to `127.0.0.1` behind the first-party ingress proxy as before.
+- **Stop OpenChamber's built-in updater from hanging the UI** — OpenChamber ships a self-update check ("update available", plus an Update button in Settings → About), but OpenChamber is pinned and patched for Home Assistant Ingress at image build time, so an in-app update cannot persist across restarts or stay Ingress-patched — it just hung the UI on "Waiting for server...". The add-on now points OpenChamber's update-check API (`OPENCHAMBER_UPDATE_API_URL`) at a local canned "no update" endpoint served by the ingress proxy, so the update notification no longer appears and the update action reports "No update available" instead of hanging. OpenChamber is updated by updating the add-on.
+
+## 2.3.5
+
+- **OpenCode attribution and license notices** - added a clear upstream credit, MIT notice, non-affiliation statement, and in-image notice for the OpenCode software distributed by this add-on.
+- **Hardened file access: sensitive files are read-protected by default (#53)** — a new **Restrict access to sensitive files** option (default on) adds an OpenCode `permission.read` deny rule for `secrets.yaml`, the `.storage/` and `.cloud/` directories, the `ssl/` directory, and `*.key`/`*.pem` files, so their contents cannot be read into the model's context. Everything else stays readable and normal `!secret`-based config editing is unaffected. Set the option to `false` to restore the previous fully-permissive behavior. Note: this guards OpenCode's file-read tool, not shell commands. Thanks @ChristopherBull for the suggestion.
+- **Fixed PPQ Private (TEE) proxy failing to start (#34)** — the `ppq-private-proxy` service resolved its entrypoint with `npm root -g` *after* sourcing `NPM_CONFIG_PREFIX=/data/.npm-global`, so it looked for `ppq-private-mode` in the persistent OpenCode prefix instead of the image's global modules and crashed with `ERR_MODULE_NOT_FOUND`. The lookup is now isolated from that override, and a missing package logs a clear error instead of a raw Node stack trace. The PPQ provider's models also carry explicit `id` fields now so OpenCode addresses them correctly. Thanks to @iBobik for diagnosing and fixing this.
+- **Fixed the low-memory start-up crash loop (issue #51)** — on 4 GB devices (for example a Home Assistant Green) the boot-time `npm install -g opencode-ai@latest` could exhaust RAM, make Supervisor unresponsive, and leave the add-on in a watchdog crash loop (repeated exit code 137). Two changes remove this. The default **OpenCode update policy** is now `bundled`, so a fresh install runs entirely on the OpenCode shipped in the image with no start-up download. When you opt into `latest`, the ingress terminal now comes up immediately on the bundled (or an existing healthy persistent) binary while the update runs in a detached background process — off the health-check critical path — that is skipped automatically when free memory is below ~1.5 GB, so the npm spike can no longer push a low-memory host into swap-thrash. An interrupted or non-working update is now discarded instead of shadowing the working bundled binary, which also fixes the related `/data/.npm-global/bin/opencode: cannot execute: required file not found` failure.
+- **Native Home Assistant MCP readiness** — `get_agent_capabilities` now probes Home Assistant Core's native MCP endpoints, including `/api/mcp/<API ID>`, and reports whether OpenCode should use regular MCP only or a hybrid native-LLM-API/OpenCode-MCP mode. The opt-in native MCP bridge is being validated in the beta channel first and does not replace OpenCode's built-in MCP tools.
+- **Better Home Assistant context and native LLM development support** — added `get_home_context` for compact area/domain/entity-scoped understanding with registry-derived area/device metadata, plus `get_ha_llm_development_guide` for upstream references, checklist, and a starter template for native `<integration>/llm.py` tool providers.
+
+## 2.3.3
+
+- **Bundled `yq` for Home Assistant-aware YAML on the command line** — the add-on image now ships [`yq`](https://github.com/mikefarah/yq) (mikefarah's static Go build, pinned `v4.53.3`), fetched per-architecture like `ttyd`. It gives the agent a YAML reader/query tool that understands Home Assistant's custom tags — `!include`, `!secret`, `!env_var`, `!input`, and the `!include_dir_*` family — which standard `python3`/PyYAML and Ruby's YAML (neither of which is installed) cannot parse: they abort on the first `!include`. `AGENTS.md` now directs the agent to `yq` for reading, querying, and converting configuration, while writes stay on the existing safe-write path (`write_config_safe`) and note the two `yq -i` caveats (a replaced value keeps its old tag; blank separator lines are dropped).
+
+## 2.3.2
+
+- **OpenChamber updated to 1.14.0** — bumped the pinned `@openchamber/web` package and promoted the Home Assistant ingress patch updates validated in beta 2.3.2b0-2.3.2b1. The ingress patcher now also handles OpenChamber 1.14.0's newer Vite modulepreload helper, preventing dynamic asset and stylesheet requests from escaping to root `/assets/...` under Home Assistant Ingress.
+
+## 2.3.1
+
+- **Configuration UI polish** — options in the Configuration tab are now grouped and ordered by how you use them: interface mode first, then terminal appearance, Home Assistant integration, OpenCode runtime, Zigbee2MQTT/serial devices, PPQ private mode, LAN server, and advanced options last. Labels follow Home Assistant's sentence-case convention with consistent naming for toggles, and descriptions use one consistent style for quoting and punctuation. The previously undocumented Home Assistant access token option now has a proper entry in the documentation. No option keys or default values changed — existing configurations are unaffected.
+
+## 2.3.0
+
+- **OpenChamber web UI** — new **Interface Mode** option (`terminal`/`openchamber`). The default `terminal` keeps the existing ttyd terminal unchanged; `openchamber` serves the OpenChamber web UI (pinned `@openchamber/web` 1.13.9) through Home Assistant Ingress on the same sidebar entry. OpenChamber binds to `127.0.0.1` inside the container behind a first-party ingress proxy, no LAN port is exposed, and Home Assistant Ingress provides the browser authentication layer. The bundle is patched at image build time so assets, API calls, SSE, and websockets resolve correctly under `/api/hassio_ingress/...`. Promoted from the beta channel after validation through beta 2.3.0b0–2.3.0b8.
+
+## 2.2.0
+
+- **Home Assistant native LLM readiness** — added a read-only `get_agent_capabilities` MCP tool and `ha://agent/capabilities` resource that report OpenCode's MCP surface, current HA version, and whether the running Home Assistant instance exposes the emerging native `llm` component. Documentation now explains the long-term plan: follow HA's LLM platform closely, prefer native capabilities when they become stable and accessible, and keep MCP for add-on/admin/dev/safety workflows.
+- **MCP 2025-11-25 alignment** — updated the MCP TypeScript SDK target to the current `1.29.x` line, added server implementation description metadata, and tightened tool schemas with `additionalProperties: false` per current MCP guidance.
+- **Compact MCP outputs** — added server-local compatibility helpers that keep newer MCP fields out of tool responses while returning machine-readable `summary`/`data`/`meta` JSON as text for OpenCode. Large state, history, logbook, docs, changelog, CLI, and ESPHome log responses are capped with truncation metadata instead of unbounded dumps.
+- **Terminal and runtime hardening** — `SUPERVISOR_TOKEN` is no longer persisted as `HA_TOKEN` in `/data/.env_vars`, OpenCode uses an app-managed executable temp directory for native TUI files, and the web terminal now translates one-finger touch drags into scroll events for mobile/tablet use.
+- **OpenCode runtime update policy** — added a `latest`/`bundled` update policy. By default the add-on installs `opencode-ai@latest` into persistent add-on data and uses that before the bundled fallback, while `bundled` disables OpenCode self-update and uses the image version only. Baseline CPU mode now logs VM CPU passthrough guidance and the known upstream baseline OOM issue.
+
+## 2.1.0
+
+- **PPQ private TEE models (beta)** — added an opt-in internal PPQ private-mode proxy, pinned at image build time, with a masked PPQ API key option and an OpenCode custom provider for PPQ private models. This feature ships in the stable add-on, but should still be considered beta while provider behavior and proxy integration are validated.
+- **Faster startup and lower resource use** — OpenCode service startup no longer waits on ESPHome/Zigbee2MQTT discovery, AGENTS.md guidance only refreshes after add-on updates, environment variables are processed in a single pass, the baseline x64 OpenCode binary is preinstalled for non-AVX2 systems, and `puppeteer-core` loads only when screenshots are used.
+- **More responsive MCP and YAML LSP** — added API/documentation fetch timeouts, short-lived caches, failed-fetch backoff, concurrent template validation, WebSocket registry calls, compact large responses, lazy YAML completion docs, debounced diagnostics, and stale diagnostic cancellation.
+- **Web terminal clipboard fixes** — copying inside OpenCode now reaches the browser clipboard through OSC 52/tmux/ttyd support, plain HTTP shows a one-click copy fallback, plain `Ctrl+V` paste works, and macOS users can use `Option+drag` to select text while full-screen terminal apps capture the mouse.
+- **Multi-arch release and CI improvements** — stable/beta images now use Home Assistant's generic multi-arch image style and Debian base image, release image assets are attached to GitHub releases, GitHub Actions are Node 24-ready, and aarch64 builds run on native ARM runners.
+- **Fixes** — corrected the `get_error_log` API path, restored YAML LSP service hover, prevented edits in one file from cancelling another file's diagnostics, and fixed release image asset uploads.
+
+## 2.0.0
+
+- **Optional LAN server mode** — added an opt-in setting that starts an OpenCode server on fixed internal port `4096`, with Home Assistant Network settings controlling any host port mapping. This allows remote clients to connect with `opencode attach` when the port is explicitly mapped. Thanks to [@benwestrate](https://github.com/benwestrate) for contributing this feature.
+- **Masked access token field** — the Home Assistant access token option now uses a password-style configuration field in the add-on UI.
+
+## 1.9.1
+
+- **Opt-in serial device access** — added a `serial_devices` option that lets users map selected host UART/serial devices into the add-on for USB flashing and adapter inspection workflows. Supervisor `uart` and `udev` manifest flags remain disabled by default because they are static permissions, not runtime user options.
+
+## 1.9.0
+
+- Reduce memory and disk pressure by disabling OpenCode snapshots by default and ignoring noisy Home Assistant internal paths in OpenCode's file watcher.
+- Improve Zigbee2MQTT URL configuration by documenting the required `http://` or `https://` scheme and automatically treating host/IP-only `z2m_url` values as `http://`.
+- Add Home Assistant add-on development folder access by mounting `/addons` and `/addon_configs`, with an opt-in guidance setting and security warnings.
+
+## 1.8.1
+
+### Build: pin hab CLI to a released version
+
+- **Pin hab CLI to `1.6.4`** — the add-on image previously built the [`hab` CLI](https://github.com/balloob/home-assistant-build-cli) from whatever commit happened to be on `main` at build time, which made builds non-reproducible and exposed users to unreviewed upstream changes. The Dockerfile now clones a specific release tag via a new `HAB_VERSION` build arg.
+- **Update monitoring workflow** — `.github/workflows/check-hab-update.yaml` now compares the pinned `HAB_VERSION` against the latest upstream GitHub release and flags drift in the job summary, instead of reporting the latest `main` commit.
+
+## 1.8.0
+
+### Zigbee and Stability Improvements
+
+- **New zigporter integration** - adds zigporter CLI tooling to the add-on for Zigbee migration and device management workflows, including a new `zigporter_run` MCP tool
+- **Z2M discovery and configuration support** - startup now supports Zigbee2MQTT discovery plus optional `z2m_url` and `z2m_mqtt_topic` configuration for zigporter commands
+- **Fix `screenshot_url` timeouts** - switched navigation wait strategy from `networkidle0` to `load` to avoid Home Assistant's persistent WebSocket causing guaranteed timeouts
+- **Fix optional Z2M URL handling** - `z2m_url` now allows empty values so users are not blocked by validation when Zigbee2MQTT is not configured
+- **Zigporter build behavior update** - zigporter is now installed as latest at image build time rather than pinning a fixed version
+
+## 1.7.2
+
+### hab CLI Documentation
+
+Improved LLM context documentation to cover all hab CLI commands added in 1.7.1.
+
+- **Fixed JSON/text flag documentation** — `--json` enables structured JSON output; text is the default. The previous docs had this inverted, which would cause errors for any agent following them.
+- **Added missing command groups to AGENTS.md, INSTRUCTIONS.md, and the `hab_run` tool description**: `scene`, `person`, `category`, `todo`, `notification`, `integration`, `repairs`, `event`, `template`, `entity logbook`, and `overview` — none of which were previously visible to the LLM
+- **Added concrete examples** for every new command group in INSTRUCTIONS.md so agents know how to invoke them correctly
+
+## 1.7.1
+
+### hab CLI Update
+
+This release rebuilds the container to pick up significant upstream improvements to the `hab` CLI ([balloob/home-assistant-build-cli](https://github.com/balloob/home-assistant-build-cli)).
+
+**New command groups**
+
+- **`todo`** — manage to-do lists and items (list, add, complete, uncomplete, update, remove)
+- **`notification`** — list, create, and dismiss persistent notifications
+- **`calendar`** — create and delete timed or all-day calendar events
+- **`integration`** — list, get, reload, enable, and disable config entries
+- **`event`** — list event types and fire custom events (JSON/YAML/file input supported)
+- **`repairs`** — list HA repair issues with severity filtering; ignore/unignore
+- **`scene`** — full CRUD plus `activate` with `--transition` support
+- **`person`** — full CRUD with device tracker and user ID support
+- **`category`** — full CRUD with scope inference from entity ID prefix; assign/remove
+- **`template`** — render Jinja2 templates inline, from `--file`, or stdin
+- **`entity logbook`** — read logbook entries with `--start`/`--end` filters
+
+**Performance improvements**
+
+- Entity list, overview, and automation list `--extended` now fire all API calls concurrently, reducing wall-clock time from multiple sequential round-trips to approximately one
+- ESPHome `GetDevices` and `GetPing` calls parallelised
+- CLI internals optimised: cached auth with `sync.Once`, atomic WebSocket message IDs, pre-allocated slices, zero-copy format detection
+
+**ESPHome ingress fix**
+
+- New `HAB_ESPHOME_TOKEN`, `HAB_ESPHOME_SESSION`, and `HA_ACCESS_TOKEN` env var overrides for ESPHome access through HA Core's ingress proxy (required since ESPHome ~2026.2.x in addon containers)
+
+## 1.7.0
+
+### Visual Verification (Screenshot Tool)
+
+- **New `screenshot_url` MCP tool** — takes screenshots of any Home Assistant frontend page using headless Chromium, enabling AI models with vision capabilities to visually verify dashboard changes, card layouts, and UI modifications
+- **Three-layer authentication** — uses localStorage token injection, WebSocket auth interception, and HTTP request header injection to reliably authenticate with the HA frontend regardless of version
+- **Opt-in via configuration** — disabled by default to keep resource usage minimal. Enable via the `screenshot_enabled` option in the add-on Configuration tab
+- **Requires Long-Lived Access Token** — uses the same `access_token` option already available for ESPHome tools to authenticate with the HA frontend
+- **Configurable viewport** — supports custom width, height, render wait time, and full-page capture
+- **HA Core URL auto-discovery** — extracted into a reusable `discoverHACoreUrl()` function shared with the ESPHome ingress discovery logic
+- Chromium and puppeteer-core added to the container image
+
+### MCP Server
+
+- **34 tools** (was 33) — `screenshot_url` added to the tool set
+- MCP server version bumped to v2.7.0
+- New `createImageContent` helper in `lib/helpers.js` for building MCP image content objects
+
+### CI/CD
+
+- **New `dev` branch** for beta development — beta releases are now tagged and built from `dev`, stable releases from `main`
+- Beta release workflow now syncs the entire `ha_opencode_beta/` directory (config, translations, changelog, docs) from dev to main automatically
+
+## 1.6.2
+
+### ESPHome Error Handling
+
+- **Clear error when ESPHome tools are used without an access token** — previously produced a cryptic 500 error; now shows step-by-step setup instructions in the MCP tools, the `hab_run` gateway, and the shell ([#16](https://github.com/magnusoverli/opencode/issues/16))
+
+### write_config_safe: Content Protection
+
+Addresses [#14](https://github.com/magnusoverli/opencode/issues/14) — `configuration.yaml` could be overwritten when the AI wrote only a single integration without reading the existing file.
+
+- **Top-level key preservation** — for mapping-based YAML files (e.g. `configuration.yaml`), `write_config_safe` now blocks any write that would remove existing top-level keys
+- **Significant size reduction guard** — writes that would reduce any config file by more than 50% (by line count) are blocked
+- **List-entry reduction** (existing) — protection for `automations.yaml`, `scripts.yaml`, and `scenes.yaml` remains, now integrated into the unified content protection system
+- All three checks can be bypassed with `confirm_deletions: true` for intentional removals
+- `.bak` files are now retained after successful writes as a recovery point
+
+### Testing Infrastructure
+
+- **102 unit tests** added across MCP server (66 tests) and LSP server (36 tests) using vitest
+- Pure functions extracted into testable `lib/` modules:
+  - MCP: `intelligence.js`, `validation.js`, `html-parser.js`, `helpers.js`
+  - LSP: `yaml-analyzer.js`, `completions.js`
+- Test files excluded from Docker image via `.dockerignore`
+
+### Bug Fixes
+
+- **watch_firmware_update**: `callApi()` → `callHA()` — was calling a non-existent function, causing firmware update monitoring to crash at runtime
+- **LSP YAML context analyzer**: `currentIndent === prevIndent` → `currentIndent = prevIndent` — no-op comparison fixed to assignment, restoring correct parent key detection in nested YAML
+
+### Cleanup
+
+- **Removed: Web UI mode** — the experimental `ui_mode: web` option has been removed (never promoted to stable). TUI mode remains the only UI
+- nginx removed from container image (reduces image size)
+
+## 1.6.1
+
+**ESPHome Connectivity Fix + hab CLI Shell Support**
+
+ESPHome 2026.2+ moved its dashboard to a Unix socket behind nginx with IP-based access rules, breaking direct connections from addon containers. This release routes all ESPHome communication through HA Core's ingress proxy, restoring full functionality for both MCP tools and the hab CLI.
+
+### ESPHome Ingress Integration
+- **All ESPHome MCP tools working again** — `esphome_list_devices`, `esphome_compile`, and `esphome_upload` now route through HA Core's ingress proxy instead of connecting directly to the ESPHome container
+- **hab CLI ESPHome commands working from shell** — `hab esphome list`, `hab esphome logs`, etc. now work when run directly from the terminal, not just through the MCP `hab_run` tool
+- **New `access_token` configuration option** — a long-lived HA Core access token is required for ESPHome ingress authentication. Create one at Profile → Long-Lived Access Tokens in the HA UI and paste it into the addon's Configuration tab. Only needed if you use ESPHome tools
+- **Automatic HA Core URL discovery** — the addon auto-discovers your HA instance URL from `internal_url` in Settings → System → Network, with automatic fallback to network interface detection if the URL is set to "automatic"
+- **WebSocket ingress session creation** — ingress sessions are created via HA Core's WebSocket API (the only method accepted by the Supervisor), using the long-lived access token for authentication
+
+### Startup ESPHome Discovery
+- New `discover-esphome.js` startup script runs the same 5-step discovery flow as the MCP server (find addon → get ingress entry → resolve HA Core URL → create WebSocket session → build URL) and writes `HAB_ESPHOME_URL` and `HAB_ESPHOME_SESSION` to the environment so `hab esphome` commands work from the shell
+- Discovery is best-effort at addon startup — if ESPHome is not installed, not running, or the access token is missing, it skips silently
+
+### Other Changes
+- **Bumped `hassio_role` to `manager`** — required for ingress session creation via the Supervisor API
+- **Safer automation editing in AGENTS.md** — AI instructions now require reading all existing automations before writing to `automations.yaml`, preventing accidental overwrites
+- **Beta channel infrastructure** — added `ha_opencode_beta` addon directory and CI workflows for beta releases, enabling faster testing of experimental changes
+
+## 1.6.0
+
+**hab CLI from Source + Debian Trixie Base Image**
+
+- **Upgraded base image to Debian Trixie** — migrated from `bookworm` (Debian 12) to `trixie` (Debian 13), bringing Node.js 18 → 20, git 2.39 → 2.47, glibc 2.36 → 2.41, and newer versions of jq, curl, and tmux
+- **hab CLI built from source** — hab is now compiled from the [main branch](https://github.com/balloob/home-assistant-build-cli) at each add-on release via a multi-stage Docker build, replacing the previous pinned release binary. This ensures the latest features and fixes are always included without waiting for upstream releases
+- **Removed daily/weekly release-tracking workflows** — the automated version-bump PRs (`update-hab-cli.yaml`, `check-hab-update.yaml`) have been replaced with a lightweight weekly status check that reports the latest commit on main
+
+## 1.5.3
+
+**hab CLI: Automated Update Tracking + Live Command Discovery**
+
+- **Automated hab update detection** — new weekly GitHub Actions workflow checks for new [hab CLI](https://github.com/balloob/home-assistant-build-cli) releases every Monday and opens a pull request automatically, keeping the version pins in `build.yaml` and `Dockerfile` in sync. Can also be triggered manually from the Actions tab.
+- **Dynamic hab help injection** — at container startup, `hab --help` output is injected live into `AGENTS.md` between sentinel markers, so the AI always sees the exact commands available in the installed hab version — no manual documentation update needed when hab gains new features
+- **Note for users who saw missing icons after the 1.5.2 repo rename**: a standard update is not sufficient to restore them — uninstall and reinstall the add-on once to refresh the Supervisor icon cache
+
+## 1.5.2
+
+**Rename: GitHub repository `ha_opencode` -> `opencode`**
+
+- Renamed GitHub repository from `magnusoverli/ha_opencode` to `magnusoverli/opencode`
+- All old URLs auto-redirect via GitHub — no action needed for existing users
+- Updated all repository URL references across config, docs, CI, and README
+- Reverted the directory rename from v1.5.1 — add-on directory must match slug for icon/logo discovery
+
+## 1.5.1
+
+**Fix: Restore add-on logo in Home Assistant update notifications**
+
+- Reverted directory rename (`opencode/` back to `ha_opencode/`) — HA Supervisor requires the directory name to match the add-on slug for icon/logo discovery
+
+## 1.5.0
+
+**Renamed to OpenCode + hab CLI Integration**
+
+Based on feedback from [@balloob](https://github.com/balloob):
+
+- **Renamed from "HA OpenCode" to "OpenCode"** across all user-facing surfaces (sidebar panel, add-on store, logs, banner, docs, build labels)
+- **MCP enabled by default** — the Home Assistant MCP integration is now on out of the box, no manual toggle needed
+- **Integrated [hab CLI](https://github.com/balloob/home-assistant-build-cli)** (Home Assistant Builder v1.4.0) — a CLI by balloob designed for AI agents to manage HA via REST and WebSocket APIs
+  - Installed as a pre-authenticated binary (amd64 + aarch64)
+  - Exposed as a native MCP tool (`hab_run`) so the AI discovers it alongside existing tools — no bash guesswork needed
+  - Covers dashboard CRUD, area/floor/zone/label management, helper creation, automation management via API, script management, backup/restore, blueprints, calendar, device management, groups, and search
+  - Security: uses `execFile` (no shell injection), blocks auth/self-update commands
+- **AGENTS.md auto-update** — on add-on update, AGENTS.md is refreshed with the latest AI instructions unless the user has customized it
+- Available in the shell help after exiting OpenCode (`hab <cmd>`)
+- MCP tool count: 32 → 33
+
+## 1.4.4
+
+**Fix: write_config_safe now blocks writes when HA config check is unavailable**
+
+- `write_config_safe` previously treated a failed HA config check API call as a success,
+  leaving unvalidated config on disk. The tool now restores the original file (or removes
+  the newly written file) whenever the validation result is anything other than an explicit
+  `"valid"` from HA Core — including when the check API is unreachable or returns an error.
+- Removed overreaching "will never fail to start" guarantees from documentation and agent
+  instructions. Claims now accurately reference the multi-layered guardrails (deprecation
+  scanning, Jinja2 pre-validation, structural checks, backup/restore, HA Core config check)
+  rather than making absolute promises.
+- Expanded DOCS.md to cover `env_vars`, `cpu_mode`, and `opencode_config` configuration options.
+
+## 1.4.2
+
+**Feature: User-Defined Environment Variables**
+
+- Added `env_vars` configuration option to pass custom environment variables into the container
+  - Supports any key/value pair (e.g. `AZURE_RESOURCE_NAME`, `OPENAI_API_KEY`)
+  - Variables are available to OpenCode, the terminal shell, and all child processes
+  - Configurable from the add-on's Configuration tab in Home Assistant
+- Security hardening:
+  - Variable names validated against strict shell identifier regex
+  - Critical system variables (`HOME`, `PATH`, `SUPERVISOR_TOKEN`, etc.) are blocked from being overridden
+  - Values are single-quote escaped to prevent shell injection
+  - File permissions set to 600 and excluded from backups to protect secrets
+- Removed unused legacy `run.sh` entry point (dead code cleanup)
+
+Closes #12
+
+## 1.4.1
+
+**CI: Prevent redundant builds and fix release notes extraction**
+
+- Added `[skip ci]` to the automated version bump commit in the release workflow, preventing unnecessary CI runs when the release bot pushes to `main`
+- Fixed changelog extraction in release workflow — the `awk` range pattern was matching the section header as both start and end, producing empty release notes
+
+## 1.4.0
+
+**Safe Config Writing & Multi-Layered Validation Pipeline**
+
+This release adds a comprehensive config validation system with multiple layers of protection against AI-written configuration causing your Home Assistant to fail to start. Inspired by community feedback on making AI coding agents safe for production HA instances.
+
+### New MCP Tool: `write_config_safe`
+- Writes YAML config files with automatic validation and backup/restore
+- If validation fails after writing, the original file is automatically restored
+- Supports `dry_run` mode to pre-validate config without touching disk
+- Validates through multiple layers before committing:
+  - Deprecation pattern scanning (20+ patterns)
+  - Jinja2 template pre-validation through HA's own template engine
+  - Structural YAML checks (automations need triggers/actions, scripts need sequences, etc.)
+  - YAML lint checks (tabs, comma-separated entity lists, multiline issues)
+  - Full HA Core config check (`POST /config/core/check_config`)
+- Path traversal protection — blocks writes to internal directories (`.storage`, `.cloud`, etc.)
+
+### Dynamic Validation Data Sources
+- **GitHub remote patterns** — deprecation patterns are fetched from the repo hourly, allowing updates between add-on releases
+- **HA Repairs API** — queries your installation's active repair/deprecation warnings via WebSocket (`repairs/list_issues`)
+- **HA Alerts feed** — checks `alerts.home-assistant.io` for known integration issues affecting your config
+- All remote sources have timeouts, caching (1 hour TTL), and graceful fallback to bundled data
+
+### LSP Real-Time Deprecation Warnings
+- The LSP server now surfaces deprecated syntax as yellow squigglies while editing YAML files
+- Shares the same pattern database as the MCP server for consistency
+- Also fetches updated patterns from GitHub in the background
+
+### Shared Deprecation Pattern Database
+- Extracted deprecation patterns from MCP server into a shared JSON file (`rootfs/opt/shared/deprecation-patterns.json`)
+- Both MCP and LSP servers load from the same source
+- Expanded from 10 to 20 patterns, adding coverage for:
+  - Legacy MQTT platform syntax (`platform: mqtt` under domain keys)
+  - Direct state object access (`states.sensor.x.state` — use `states('sensor.x')`)
+  - Direct attribute access (`states.sensor.x.attributes` — use `state_attr()`)
+  - `entity_id` inside `data:` (should use `target:`)
+  - `hassio` service domain (renamed to `homeassistant`)
+  - String format `for:` durations (should use dict format)
+  - Legacy `value_template` key (modern template sensors use `state:`)
+
+### Updated Agent Instructions
+- `INSTRUCTIONS.md` updated with mandatory `write_config_safe` workflow
+- `AGENTS.md` updated with new tool references and deprecation guidance
+- MCP server version bumped to v2.6.0 (Safe Config Edition), tool count 31 → 32
+
+## 1.3.7
+
+**Housekeeping: Licensing, CI, and Documentation**
+
+- Added missing `ws`, `prettier`, and Home Assistant base image entries to `THIRD-PARTY-LICENSES.md`, including the Apache-2.0 license text for the HA base image
+- Contributor mentions in the changelog are now linked directly to GitHub profiles
+- Split CI build workflow into separate per-architecture jobs (`build-aarch64.yaml`, `build-amd64.yaml`) to enable independent build status badges in the README
+- CI workflow runs now include the version number in their name for easier identification in the Actions tab
+
+## 1.3.6
+
+**Bug Fix: ARM64 Initialization Failure + Documentation Overhaul**
+
+- Fixed OpenCode failing to start on ARM64 devices (e.g. Home Assistant Green) — ARM64 was incorrectly routed into `baseline` mode even though no ARM64 baseline package exists, leaving the session with a non-existent binary path. ARM64 now correctly uses the regular OpenCode binary (reported by [@timsteinberg](https://github.com/timsteinberg) and [@wizzyto12](https://github.com/wizzyto12), fixed by [@Teeflo](https://github.com/Teeflo))
+- Fixed potential infinite exec loop in the OpenCode wrapper when `/usr/local/bin/opencode` was already a symlink from a previous run (fixed by [@Teeflo](https://github.com/Teeflo))
+- Added safe fallback in `opencode-session.sh` for the edge case where ARM64 baseline mode is manually forced via config (fixed by [@Teeflo](https://github.com/Teeflo))
+- Revamped README with improved structure, clearer installation steps, and updated badges (contributed by [@Teeflo](https://github.com/Teeflo))
+- Corrected MCP tool count (22 → 31), resource count (9 → 13), and added go-to-definition to the LSP feature description to reflect the actual implementation
+- Updated icon and logo assets (contributed by [@Teeflo](https://github.com/Teeflo))
+
+## 1.3.5
+
+**Bug Fix: ARM64 Baseline Binary Initialization (fixes [#7](https://github.com/magnusoverli/ha_opencode/issues/7))**
+
+- Fixed OpenCode failing to initialize on ARM64 devices (e.g. Home Assistant Green) when using the baseline binary
+  - `OPENCODE_BIN_PATH` in `opencode-session.sh` was hardcoded to the x64 baseline path — now correctly resolves based on architecture
+- Added proper ARM64 detection in CPU capability check, skipping the irrelevant x86 AVX flag inspection
+- Fixed potential infinite exec loop in the OpenCode wrapper fallback path
+- Thanks to [@timsteinberg](https://github.com/timsteinberg) and [@Teeflo](https://github.com/Teeflo) for reporting!
+
+## 1.3.4
+
+Re-tagged release to include the changelog in the published image (1.3.0–1.3.3 were built before the changelog was finalized).
+
+## 1.3.3
+
+**Architecture Refactor, CPU Compatibility, and Bug Fixes**
+
+- Refactored s6 service architecture: initialization logic (directory setup, config generation, file deployment) now runs once in a dedicated `init-opencode` oneshot service, keeping the ttyd long-running service clean and focused
+- Added CPU baseline detection for older processors without AVX2 support — the add-on now auto-detects CPU capabilities and selects the appropriate OpenCode binary (configurable via `cpu_mode`: auto/baseline/regular)
+- Added custom OpenCode configuration injection — power users can now paste a JSON config in the add-on settings to customize OpenCode behavior (providers, keybindings, etc.)
+- Fixed MCP `get_error_log` tool returning 404 errors by routing through the correct Supervisor proxy endpoint (`/core/api/error_log`)
+- Fixed init-opencode oneshot service failing to execute (absolute path in `up` file)
+- Fixed CPU auto-detection crashing on base image (replaced `grep -oP` with portable `awk`)
+- Terminal banner now displays the actual add-on version instead of hardcoded "v1.0"
+
+Inspired by work done in [okliam's fork](https://github.com/okliam). Thanks for exploring these ideas!
+
+## 1.1.8
+
+**New Feature: Prettier YAML Formatter + Comprehensive Style Guide**
+
+- Added Prettier formatter for automatic YAML formatting aligned with Home Assistant conventions
+- Installed globally in container and auto-configured for `.yaml`/`.yml` files
+- Deploys `.prettierrc.yaml` to `/homeassistant/` on first install (user-customizable)
+- Added comprehensive YAML Style Guide section to AGENTS.md covering all 13 official HA YAML formatting rules
+- Style guide includes good/bad examples for each rule and marks rules Prettier cannot enforce
+- AI agents now have explicit, inline guidance to write HA-compliant YAML on every change
+- Reference: https://developers.home-assistant.io/docs/documenting/yaml-style-guide/
+
+## 1.1.6
+
+**Bug Fix: Multiple OpenCode Instances Spawning (fixes [#4](https://github.com/magnusoverli/ha_opencode/issues/4))**
+
+- Fixed container health check failing due to missing `pgrep` (added `procps` package)
+- Added `tmux` for session persistence — reconnecting now reattaches to the existing session instead of spawning a new OpenCode instance
+- Prevents orphaned OpenCode processes from accumulating and consuming memory on resource-constrained devices (e.g. Raspberry Pi)
+
+## 1.1.5
+
+**Bug Fix: watch_firmware_update Timeout**
+
+- Fixed `watch_firmware_update` tool timing out before returning results
+- Tool now returns immediately with current status instead of blocking
+- Call the tool repeatedly to monitor progress (AI can poll as needed)
+- Removed unused `poll_interval` and `timeout` parameters
+
+## 1.1.4
+
+**Bug Fix: Update Tools Not Available**
+
+- Fixed critical bug where update management and ESPHome tools were defined in the wrong array
+- Tools `watch_firmware_update`, `get_available_updates`, `update_component`, `get_update_progress`, `get_running_jobs`, and ESPHome tools are now properly exposed
+- AI assistants can now use these tools for firmware and system updates
+
+## 1.1.3
+
+**Documentation: Update Management Instructions**
+
+- Added update management section to INSTRUCTIONS.md and AGENTS.md
+- AI assistants now properly use `watch_firmware_update` for device updates
+- Documented `get_available_updates`, `update_component`, and `get_update_progress` tools
+- Added example patterns for firmware and system updates
+
+## 1.1.2
+
+**Build Fix: Prevent Update Race Condition**
+
+- Fixed timing issue where updates appeared in Home Assistant before images were built
+- Workflow now triggers on tag push instead of release creation
+- Version in config.yaml is automatically updated after images are successfully pushed
+- GitHub release is created automatically after build completes
+
+## 1.1.1
+
+**New Feature: Visual Firmware Update Monitoring**
+
+- Added `watch_firmware_update` MCP tool for real-time update monitoring (MCP server v2.5)
+  - Beautiful visual timeline with timestamps and status icons
+  - Tracks progress from initiation through reboot to completion
+  - Works with ESPHome, WLED, Zigbee coordinators, and any Home Assistant update entity
+  - Automatic progress bar when device reports percentage
+  - Optional `start_update` parameter to initiate update before monitoring
+  - Configurable `poll_interval` (1-30s) and `timeout` (1-30min)
+  - Clear success/failure summary with version change display
+  - Troubleshooting tips on failure
+
+## 1.1.0
+
+**Infrastructure: Pre-built Docker Images**
+
+- Add-on now uses pre-built Docker images from GitHub Container Registry
+  - Update progress now visible in Home Assistant UI
+  - Significantly faster updates (no local build required)
+  - Images built automatically via GitHub Actions on each release
+- Added CI/CD workflow for multi-architecture builds (amd64, aarch64)
+- Existing users automatically migrate on update - no manual steps required
+
+## 1.0.17
+
+**New Feature: ESPHome Integration**
+
+- Added 3 new MCP tools for ESPHome device management (MCP server v2.4)
+  - `esphome_list_devices` - List all configured ESPHome devices with version info
+  - `esphome_compile` - Compile firmware with full build log output
+  - `esphome_upload` - Flash firmware to devices via OTA or USB
+- Real-time build log streaming via WebSocket connection to ESPHome add-on
+- Auto-discovery of ESPHome add-on via Supervisor API
+- Added `ws` WebSocket dependency for ESPHome communication
+- Graceful error handling when ESPHome is not installed or not running
+- Build log truncation for large outputs (>300 lines)
+- Helpful troubleshooting tips included on compile/upload failures
+
+## 1.0.16
+
+**New Feature: Update Management**
+
+- Added 5 new MCP tools for managing Home Assistant updates (MCP server v2.3)
+  - `get_available_updates` - Check for updates across Core, OS, Supervisor, and apps
+  - `get_addon_changelog` - View app changelogs before updating
+  - `update_component` - Initiate updates with optional backup
+  - `get_update_progress` - Real-time progress monitoring with visual feedback
+  - `get_running_jobs` - List all Supervisor jobs (updates, backups, restores)
+- Added `callSupervisor()` API wrapper for direct Supervisor API access
+- Safety guard prevents self-update from within the container (use HA UI instead)
+
+## 1.0.15
+
+**Build Improvements**
+
+- Improved Dockerfile for best practices and performance
+  - Use dynamic BUILD_VERSION label instead of hardcoded version
+  - Add configurable OPENCODE_VERSION arg for reproducible builds
+  - Fix parallel npm install with proper subshell syntax
+  - Replace deprecated `--production` flag with modern `--omit=dev`
+  - Remove npm audit suppression for better security visibility
+  - Consolidate ENV and RUN layers for efficiency
+  - Add .dockerignore to exclude unnecessary files from build context
+- Fixed license in build.yaml (MIT → Unlicense)
+
+## 1.0.14
+
+**Terminology Update**
+
+- Renamed "add-on" to "app" throughout the project to align with Home Assistant 2026.1 rebranding
+  - Home Assistant now calls add-ons "apps" to better reflect that they are standalone applications running alongside Home Assistant
+  - Updated all documentation, comments, and user-facing strings
+
+## 1.0.13
+
+**Bug Fixes**
+
+- Fixed font rendering issues in web terminal (fixes #1)
+  - Removed explicit fontFamily configuration from ttyd
+  - Browser now uses default monospace font, avoiding letter-spacing issues when specified fonts aren't installed
+  - Thanks to @pixeye33 for reporting!
+- Fixed invalid JSON Schema for call_service MCP tool (fixes #2)
+  - Updated target properties (entity_id, area_id, device_id) to use `oneOf` with proper `items` definition for array types
+  - AI model APIs (OpenAI, Anthropic) now accept the schema without validation errors
+  - Thanks to @Teeflo for the detailed bug report!
+
+## 1.0.12
+
+**Bug Fixes**
+
+- Fixed MCP server API endpoint access
+  - Added `callHACore()` function for direct Home Assistant Core API access
+  - Fixed `get_error_log` to use correct endpoint (`/api/error_log` via Core API)
+  - Some endpoints are not available via Supervisor proxy and require direct Core API access
+- Improved device discovery in `get_devices` tool
+  - More reliable device listing by iterating through all entity states
+  - Ensures all devices are discovered, including those missed by filter-based approaches
+
+
+
+## 1.0.11
+
+
+**Bug Fixes**
+
+- Fixed MCP server Jinja2 template bugs
+  - Fixed `get_areas` template to use `namespace()` for proper list accumulation
+  - Fixed `get_devices` to return device attributes (name, manufacturer, model, area)
+  - Fixed `get_error_log` endpoint from `/error_log` to `/error/all`
+  - Fixed `ha://areas` resource template with namespace() fix
+
+## 1.0.10
+
+**MCP Server Enhancements**
+
+- Added documentation tools to MCP server v2.2 (Documentation Edition)
+  - `get_integration_docs` - Fetch live documentation from Home Assistant website
+  - `get_breaking_changes` - Check for breaking changes by version/integration
+  - `check_config_syntax` - Validate YAML for deprecated patterns
+  - Implemented HTML parsing and content extraction from HA documentation pages
+  - Added deprecation pattern database for common configuration issues
+  - LLMs now guided to always verify syntax against current docs before writing config
+- Enhanced AGENTS.md with Home Assistant interaction guidelines
+  - Added Home Assistant Interaction Model section
+  - Added RESTRICTED section listing internal directories that should never be accessed
+  - Provided guidance on when to use configuration files vs MCP tools
+
+
+All notable changes to this project will be documented in this file.
+
+## 1.0.9
+
+**UI Improvements**
+
+- Updated app icon and logo images
+
+## 1.0.7
+
+**New Feature**
+
+- Added AGENTS.md customization feature
+  - Default AGENTS.md file deployed to Home Assistant config directory on first install
+  - Contains AI instructions and rules for OpenCode behavior
+  - Users can customize AGENTS.md to add their own rules, preferences, and context
+  - Edit `/config/AGENTS.md` using File Editor or any text editor
+  - Includes user consent rules, Home Assistant knowledge, safety guidelines, and MCP awareness
+
+## 1.0.6
+
+**Documentation**
+
+- Added LICENSE file (MIT License)
+- Added repository README.md with installation instructions
+- Cleaned up CHANGELOG to match repository history
+
+## 1.0.5
+
+**Improvements**
+
+- Optimized Docker build process with better layer caching
+  - Copy package.json files first to preserve npm install cache
+  - Install MCP and LSP dependencies in parallel for faster builds
+  - Code changes no longer invalidate dependency installation cache
+- Simplified configuration script
+  - Combined MCP and LSP configuration into single operation
+  - Streamlined logging output
+- Improved startup experience
+  - Removed unnecessary delay before launching OpenCode
+
+## 1.0.0
+
+**Initial Release**
+
+- OpenCode AI coding agent for Home Assistant
+- Web terminal with ingress support
+- Access to your configuration directory
+- `ha-logs` command for viewing system logs
+- MCP server for AI assistant integration (experimental)
+- `ha-mcp` command to manage MCP integration
+- Support for 75+ AI providers
+- Home Assistant LSP (Language Server) for intelligent YAML editing
+  - Entity ID autocomplete
+  - Service autocomplete
+  - Hover information for entities and services
+  - Diagnostics for unknown entities/services
+  - Go-to-definition for !include and !secret references

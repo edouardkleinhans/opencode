@@ -1,0 +1,27 @@
+#!/command/with-contenv bashio
+# Shared ingress router. s6 owns each UI backend independently.
+export NODE_OPTIONS="--max-old-space-size=768"
+# Both interfaces attach to the same supervised V2 backend.
+export HA_INGRESS_UI=$(cat /data/.interface_mode 2>/dev/null || echo "terminal")
+export OPENCHAMBER_UPSTREAM_PORT=3010
+if [ "${HA_INGRESS_UI}" != "openchamber" ]; then
+    export HA_INGRESS_UI="terminal"
+    export OPENCHAMBER_UPSTREAM_PORT=8100
+fi
+export OPENCHAMBER_ALLOW_ANY_REMOTE="false"
+export HA_INGRESS_PROXY_IP="172.30.32.2"
+export OPENCHAMBER_INGRESS_HOST="0.0.0.0"
+export OPENCHAMBER_INGRESS_PORT=8099
+export OPENCHAMBER_UPSTREAM_HOST="127.0.0.1"
+
+# Do not wait for a UI or MCP backend: setup must survive independent restarts.
+# Do not inherit user runtime overrides, Supervisor credentials or MCP secrets.
+exec env -i PATH="/usr/local/bin:/usr/bin:/bin" NODE_OPTIONS="${NODE_OPTIONS}" \
+    HA_INGRESS_UI="${HA_INGRESS_UI}" \
+    HA_INGRESS_PROXY_IP="${HA_INGRESS_PROXY_IP}" \
+    OPENCHAMBER_ALLOW_ANY_REMOTE="${OPENCHAMBER_ALLOW_ANY_REMOTE}" \
+    OPENCHAMBER_INGRESS_HOST="${OPENCHAMBER_INGRESS_HOST}" \
+    OPENCHAMBER_INGRESS_PORT="${OPENCHAMBER_INGRESS_PORT}" \
+    OPENCHAMBER_UPSTREAM_HOST="${OPENCHAMBER_UPSTREAM_HOST}" \
+    OPENCHAMBER_UPSTREAM_PORT="${OPENCHAMBER_UPSTREAM_PORT}" \
+    node /usr/local/bin/openchamber-ingress-proxy.js

@@ -1,0 +1,154 @@
+# Third-Party Licenses
+
+This project incorporates third-party software components, each with their
+own licensing terms. While the original code in this project is released
+into the public domain under the Unlicense, the following dependencies
+retain their respective licenses.
+
+## Runtime Dependencies
+
+### MCP Server Dependencies
+
+| Package | License | Source |
+|---------|---------|--------|
+| @modelcontextprotocol/sdk | MIT | https://github.com/modelcontextprotocol/sdk |
+| ws | MIT | https://github.com/websockets/ws |
+| zod | MIT | https://github.com/colinhacks/zod |
+
+### LSP Server Dependencies
+
+| Package | License | Source |
+|---------|---------|--------|
+| vscode-languageserver | MIT | https://github.com/microsoft/vscode-languageserver-node |
+| vscode-languageserver-textdocument | MIT | https://github.com/microsoft/vscode-languageserver-node |
+| yaml | ISC | https://github.com/eemeli/yaml |
+
+## System Components
+
+| Component | License | Source |
+|-----------|---------|--------|
+| ttyd | MIT | https://github.com/tsl0922/ttyd |
+| OpenCode | MIT | https://github.com/anomalyco/opencode |
+| OpenChamber | MIT | https://github.com/btriapitsyn/openchamber |
+| Prettier | MIT | https://github.com/prettier/prettier |
+| Node.js | MIT | https://github.com/nodejs/node |
+| Home Assistant base image | Apache-2.0 | https://github.com/home-assistant/docker-base |
+
+### Focus-Friendly Response Guidance
+
+The optional focus-friendly response guidance is an independent Home Assistant
+adaptation of response-design ideas from [i-have-adhd](https://github.com/ayghri/i-have-adhd),
+copyright (c) 2026 Ayoub Ghriss. The add-on does not install or fetch that
+project's plugin; the local guidance is included under the MIT License.
+
+```
+MIT License
+
+Copyright (c) 2026 Ayoub Ghriss
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## License Texts
+
+### OpenCode
+
+This add-on redistributes and integrates OpenCode, copyright © 2025 opencode.
+OpenCode is licensed under the MIT License:
+
+```
+MIT License
+
+Copyright (c) 2025 opencode
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+This independent Home Assistant add-on is not made by, affiliated with, or
+endorsed by the OpenCode team or Anomaly.
+
+### MIT License
+
+```
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### Apache License 2.0
+
+```
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
+
+### ISC License
+
+```
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+```

@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""Public CLI for the single Supervisor-managed OpenCode server."""
+
+import json
+import os
+from pathlib import Path
+import runpy
+import sys
+
+RUNTIME_ROOT = "/run/opencode-v2"
+SERVER_URL = "http://127.0.0.1:4100"
+VERSION_FILE = "/usr/local/share/opencode-v2-certified-version"
+LAUNCHER = "/usr/local/bin/opencode-v2-tui-launch"
+SELF_TEST = "/usr/local/bin/opencode-v2-self-test"
+
+HELP = """OpenCode — Home Assistant managed V2 client
+
+  opencode                         Attach the terminal to the managed server
+  opencode --continue              Resume the most recent session
+  opencode --session <id>          Attach to an existing session
+  opencode run <message>           Run a prompt on the managed server
+  opencode api GET /api/info       Query the managed server explicitly
+  opencode readonly               Start a managed read-only session
+  opencode status                 Inspect the existing conversation server
+  opencode service status         Alias for managed-server status
+  opencode --version              Print the image's certified V2 version
+
+The server is owned by Home Assistant/s6 at http://127.0.0.1:4100.
+Use the app controls to start, stop or restart it. This client never starts a
+background service or selects another runtime. Provider sign-in is /connect in
+the terminal. Run opencode-v2-self-test for authenticated policy checks.
+"""
+
+
+def managed_status():
+    policy = runpy.run_path(SELF_TEST)
+    reporter = policy["Reporter"](True)
+    result = {"endpoint": SERVER_URL, "managed_by": "Home Assistant/s6"}
+    try:
+        if os.geteuid() != 0:
+            raise policy["SelfTestError"]("Managed status requires the app's root shell")
+        policy["harden_process"](reporter)
+        password, *_ = policy["read_runtime_material"](RUNTIME_ROOT, reporter)
+        info = policy["ApiClient"](SERVER_URL, password).request("/api/info")
+        expected = Path(VERSION_FILE).read_text().strip()
+        if not isinstance(info, dict) or info.get("version") != expected:
+            raise policy["SelfTestError"]("Managed server version differs from the image pin")
+        result.update(state="running", version=expected)
+        status = 0
+    except (policy["SelfTestError"], OSError):
+        # Do not echo remote response bodies, file contents or credentials.
+        result.update(state="unavailable", message="The managed V2 server is unavailable; inspect the app logs")
+        status = 1
+    print(json.dumps(result))
+    return status
+
+
+def readonly(arguments):
+    agent_id = "home-assistant-read-only"
+    if arguments == ["--print-config"]:
+        config = json.loads(Path(RUNTIME_ROOT, "managed.json").read_text())
+        print(json.dumps({"agent": agent_id, "policy": config["agents"][agent_id]}, indent=2))
+        return 0
+    if arguments:
+        print("usage: ha-readonly [--print-config]", file=sys.stderr)
+        return 2
+    policy = runpy.run_path(SELF_TEST)
+    reporter = policy["Reporter"](True)
+    policy["harden_process"](reporter)
+    password, *_ = policy["read_runtime_material"](RUNTIME_ROOT, reporter)
+    client = policy["ApiClient"](SERVER_URL, password)
+    try:
+        created = client.request("/api/session", method="POST", payload={
+            "title": "Home Assistant read-only investigation", "agent": agent_id,
+        })
+        session_id = created["data"]["id"]
+    except (policy["SelfTestError"], KeyError, TypeError):
+        print("Could not create a read-only session on the managed server.", file=sys.stderr)
+        return 1
+    os.execv(LAUNCHER, [LAUNCHER, RUNTIME_ROOT, "--session", session_id])
+
+
+def main(arguments):
+    if arguments in (["--help"], ["-h"]):
+        print(HELP)
+        return 0
+    if arguments in (["--version"], ["-v"]):
+        print("opencode v" + Path(VERSION_FILE).read_text().strip())
+        return 0
+    if arguments in (["status"], ["service", "status"], ["service", "status", "--json"]):
+        return managed_status()
+    if arguments and arguments[0] == "readonly":
+        return readonly(arguments[1:])
+    if arguments and arguments[0] in {"service", "serve", "upgrade", "update", "uninstall"}:
+        print("OpenCode is managed by Home Assistant. Use the app controls; no separate service was started.", file=sys.stderr)
+        return 2
+    os.execv(LAUNCHER, [LAUNCHER, RUNTIME_ROOT, *arguments])
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except OSError:
+        print("The managed OpenCode client is unavailable; inspect the app logs.", file=sys.stderr)
+        sys.exit(1)

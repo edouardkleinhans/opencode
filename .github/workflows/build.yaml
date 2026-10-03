@@ -1,0 +1,255 @@
+---
+name: Build
+run-name: "Build ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}"
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., 3.0.0)'
+        required: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ha_opencode
+
+jobs:
+  build:
+    name: Build ${{ matrix.ha_arch }}
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ha_arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - ha_arch: aarch64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Building stable version: ${VERSION}"
+
+      - name: Get stable build args
+        id: stable_build_args
+        shell: bash
+        run: |
+          OPENCHAMBER_VERSION=$(sed -n 's/^[[:space:]]*OPENCHAMBER_VERSION:[[:space:]]*"\([^"]*\)".*/\1/p' ha_opencode/build.yaml)
+          if [ -z "${OPENCHAMBER_VERSION}" ]; then
+            echo "::error::OPENCHAMBER_VERSION not found in ha_opencode/build.yaml"
+            exit 1
+          fi
+          echo "openchamber_version=${OPENCHAMBER_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Using OpenChamber ${OPENCHAMBER_VERSION} for stable build"
+          OPENCHAMBER_REVISION=$(sed -n 's/^[[:space:]]*OPENCHAMBER_REVISION:[[:space:]]*"\([^"]*\)".*/\1/p' ha_opencode/build.yaml)
+          if ! printf '%s' "${OPENCHAMBER_REVISION}" | grep -Eq '^[a-f0-9]{40}$'; then
+            echo "::error::OPENCHAMBER_REVISION must be an immutable commit"
+            exit 1
+          fi
+          echo "openchamber_revision=${OPENCHAMBER_REVISION}" >> "$GITHUB_OUTPUT"
+
+          OPENCODE_V2_VERSION=$(sed -n 's/^[[:space:]]*OPENCODE_V2_VERSION:[[:space:]]*"\([^"]*\)".*/\1/p' ha_opencode/build.yaml)
+          if ! printf '%s' "${OPENCODE_V2_VERSION}" | grep -Eq '^2\.[0-9]+\.[0-9]+$'; then
+            echo "::error::OPENCODE_V2_VERSION must be an exact official V2 version, got '${OPENCODE_V2_VERSION}'"
+            exit 1
+          fi
+          PACKAGE_V2_VERSION=$(node -p "require('./ha_opencode/rootfs/opt/opencode-v2-homeassistant/package.json').dependencies['@opencode/cli']")
+          if [ "${PACKAGE_V2_VERSION}" != "${OPENCODE_V2_VERSION}" ]; then
+            echo "::error::build.yaml V2 pin ${OPENCODE_V2_VERSION} does not match package ${PACKAGE_V2_VERSION}"
+            exit 1
+          fi
+          echo "opencode_v2_version=${OPENCODE_V2_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Using OpenCode V2 ${OPENCODE_V2_VERSION} for stable build"
+
+      - name: Assert this folder really is the stable add-on
+        shell: bash
+        run: |
+          # Channel identity controls storage and shared-workspace paths.
+          grep -qx 'slug: "ha_opencode"' ha_opencode/config.yaml || {
+            echo "::error::ha_opencode/config.yaml does not declare slug ha_opencode."
+            grep -n "^slug:" ha_opencode/config.yaml
+            exit 1
+          }
+          test -f ha_opencode/Dockerfile || {
+            echo "::error::ha_opencode/Dockerfile is missing — the stable add-on is not self-contained."
+            exit 1
+          }
+          echo "OK: building the stable add-on from ha_opencode/ with ADDON_CHANNEL=stable."
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Run target-native V2 boundary fixture
+        uses: docker/build-push-action@v7
+        with:
+          context: ha_opencode
+          file: ha_opencode/Dockerfile
+          platforms: ${{ matrix.platform }}
+          target: boundary-test
+          push: false
+          build-args: |
+            BUILD_FROM=ghcr.io/home-assistant/base-debian:trixie
+            BUILD_VERSION=${{ steps.version.outputs.version }}
+            BUILD_ARCH=${{ matrix.ha_arch }}
+            ADDON_CHANNEL=stable
+            OPENCODE_V2_VERSION=${{ steps.stable_build_args.outputs.opencode_v2_version }}
+            OPENCHAMBER_VERSION=${{ steps.stable_build_args.outputs.openchamber_version }}
+            OPENCHAMBER_REVISION=${{ steps.stable_build_args.outputs.openchamber_revision }}
+          cache-from: type=gha,scope=${{ env.IMAGE_NAME }}-${{ matrix.ha_arch }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.ha_arch }} image
+        uses: docker/build-push-action@v7
+        with:
+          context: ha_opencode
+          file: ha_opencode/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/${{ matrix.ha_arch }}:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/${{ matrix.ha_arch }}:latest
+          build-args: |
+            BUILD_FROM=ghcr.io/home-assistant/base-debian:trixie
+            BUILD_VERSION=${{ steps.version.outputs.version }}
+            BUILD_ARCH=${{ matrix.ha_arch }}
+            ADDON_CHANNEL=stable
+            OPENCODE_V2_VERSION=${{ steps.stable_build_args.outputs.opencode_v2_version }}
+            OPENCHAMBER_VERSION=${{ steps.stable_build_args.outputs.openchamber_version }}
+            OPENCHAMBER_REVISION=${{ steps.stable_build_args.outputs.openchamber_revision }}
+          cache-from: type=gha,scope=${{ env.IMAGE_NAME }}-${{ matrix.ha_arch }}
+          cache-to: type=gha,mode=max,scope=${{ env.IMAGE_NAME }}-${{ matrix.ha_arch }}
+          labels: |
+            io.hass.arch=${{ matrix.ha_arch }}
+            io.hass.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.title=OpenCode
+            org.opencontainers.image.description=AI coding agent for Home Assistant
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.licenses=Unlicense AND MIT
+            io.hass.name=OpenCode
+
+  manifest:
+    name: Publish multi-arch manifest
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create multi-arch manifest
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          docker buildx imagetools create \
+            --tag "${IMAGE}:${VERSION}" \
+            --tag "${IMAGE}:latest" \
+            "${IMAGE}/amd64:${VERSION}" \
+            "${IMAGE}/aarch64:${VERSION}"
+
+      - name: Inspect multi-arch manifest
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: docker buildx imagetools inspect "${IMAGE}:${VERSION}"
+
+      - name: Write release image assets
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          docker buildx imagetools inspect "${IMAGE}:${VERSION}" > image-manifest.txt
+          {
+            echo "# Container images"
+            echo
+            echo "Published from ${GITHUB_REPOSITORY}@${GITHUB_SHA}."
+            echo
+            echo "| Purpose | Image |"
+            echo "|---------|-------|"
+            echo "| Multi-arch version tag | \`${IMAGE}:${VERSION}\` |"
+            echo "| Multi-arch latest tag | \`${IMAGE}:latest\` |"
+            echo "| Legacy amd64 alias | \`${IMAGE}/amd64:${VERSION}\` |"
+            echo "| Legacy aarch64 alias | \`${IMAGE}/aarch64:${VERSION}\` |"
+            echo
+            echo "## Manifest"
+            echo
+            echo '```text'
+            cat image-manifest.txt
+            echo '```'
+          } > container-images.md
+
+      - name: Upload image assets to GitHub Release
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          for _attempt in {1..30}; do
+            if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+              gh release upload "${RELEASE_TAG}" \
+                --repo "${GITHUB_REPOSITORY}" \
+                container-images.md \
+                image-manifest.txt \
+                --clobber
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "::error::GitHub Release ${RELEASE_TAG} was not found"
+          exit 1
