@@ -3,6 +3,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- OpenChamber Relay: option `openchamber_relay_host` to host the pairing relay passively on the managed instance, so relay-paired devices survive restarts and updates (see `ha_opencode/DOCS.md` 'OpenChamber Relay Hosting'). Fixes #151.
 - Promote beta 3.2.0b8 to stable with hab 1.7.2 native compact discovery, verified dashboard patches and opt-in experimental Assist integration.
 
 ## 3.2.0
