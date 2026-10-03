@@ -1,0 +1,7 @@
+#!/command/with-contenv bashio
+if [ ! -f /run/opencode-v2/ready ] || [ "$(cat /run/opencode-v2/lsp-enabled 2>/dev/null)" != true ]; then
+    exec sleep infinity
+fi
+umask 177
+bashio::log.info "Starting credential-isolated Home Assistant LSP on a root-only Unix socket"
+exec s6-ipcserver -q -a 0600 -c 4 -C 4 /run/opencode-v2/lsp.sock /usr/local/bin/ha-lsp-worker

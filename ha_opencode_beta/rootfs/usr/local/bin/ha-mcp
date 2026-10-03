@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Inspect the running integration instead of creating a V1 config or MCP process.
+set -eu
+case "${1:-help}" in
+    status|tools|test)
+        unset OPENCODE_V2_CREDENTIAL_SOCKET
+        export LD_PRELOAD=/usr/local/lib/opencode-v2-non-dumpable.so
+        exec node /opt/ha-mcp-server/managed-cli.js "$1"
+        ;;
+    enable|disable)
+        printf '%s\n' "Set MCP integration in the app Configuration tab and restart the app. Managed V2 configuration is generated at startup."
+        exit 2
+        ;;
+    help|--help|-h)
+        printf '%s\n' "Usage: ha-mcp {status|tools|test}" "Queries the existing authenticated Home Assistant MCP sidecar; does not start another server."
+        ;;
+    *) printf '%s\n' "Unknown command; use ha-mcp help" >&2; exit 2 ;;
+esac

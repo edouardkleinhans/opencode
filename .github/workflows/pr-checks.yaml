@@ -1,0 +1,211 @@
+---
+name: PR Checks
+
+# The behavioural checks used to run only when a tag or a manual dispatch built
+# an image, which is far too late: by then the change is already on main and a
+# broken runtime contract is discovered during a release rather than in review.
+# These run on every pull request instead, and are deliberately fast — the image
+# itself is built by the release workflows and smoke-tested on a real Home
+# Assistant instance with `opencode-smoke-test`.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    name: Runtime, skill and read-only contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.15.0
+
+      - name: Install exact V2 beta dependency set for integrated contracts
+        working-directory: ha_opencode_beta/rootfs/opt/opencode-v2-homeassistant
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify matching CLI and plugin pins
+        working-directory: ha_opencode_beta/rootfs/opt/opencode-v2-homeassistant
+        run: npm run verify:versions
+
+      - name: Install beta MCP dependencies for the shared Assist authentication boundary
+        working-directory: ha_opencode_beta/rootfs/opt/ha-mcp-server
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Prepare isolated editor contract dependencies
+        run: |
+          editor_deps="${RUNNER_TEMP}/ha-editor-contracts"
+          npm install --prefix "${editor_deps}" --ignore-scripts --no-audit --no-fund \
+            @codemirror/autocomplete@6.20.3 @codemirror/lint@6.9.7 \
+            @codemirror/state@6.7.1 @codemirror/view@6.43.9 \
+            typescript@5.9.3 jsdom@26.1.0 express@5.2.1
+          echo "HA_EDITOR_TEST_DEPS=${editor_deps}" >> "${GITHUB_ENV}"
+          cp ha_opencode_beta/rootfs/opt/openchamber/editor-lsp/editor* "${editor_deps}/"
+          "${editor_deps}/node_modules/.bin/tsc" --noEmit --strict --module esnext \
+            --moduleResolution bundler --target ES2022 --lib ES2022,DOM "${editor_deps}/editor.ts"
+
+      - name: Beta add-on contract tests
+        env:
+          HA_ASSIST_BROWSER_EXECUTABLE: /usr/bin/google-chrome
+        run: node --test "ha_opencode_beta/test/*.test.js"
+
+      - name: Beta external MCP root boundary
+        run: sudo "$(command -v node)" --test ha_opencode_beta/test/opencode-v2-external-mcp.test.js
+
+      - name: Native provider credential loader boundary
+        run: sudo "$(command -v node)" --test ha_opencode_beta/test/opencode-v2-provider-environment.test.js
+
+      - name: Install exact V2 stable dependency set for integrated contracts
+        working-directory: ha_opencode/rootfs/opt/opencode-v2-homeassistant
+        run: npm ci --no-audit --no-fund && npm run verify:versions
+
+      - name: Install stable MCP dependencies for the shared Assist authentication boundary
+        working-directory: ha_opencode/rootfs/opt/ha-mcp-server
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Stable add-on contract tests
+        env:
+          HA_ASSIST_BROWSER_EXECUTABLE: /usr/bin/google-chrome
+        run: node --test "ha_opencode/test/*.test.js"
+
+      - name: Stable external MCP root boundary
+        run: sudo "$(command -v node)" --test ha_opencode/test/opencode-v2-external-mcp.test.js
+
+      - name: Stable native provider credential loader boundary
+        run: sudo "$(command -v node)" --test ha_opencode/test/opencode-v2-provider-environment.test.js
+
+      - name: HA-facing MCP discovery and service lifecycle contracts
+        run: node --test scripts/ha-facing-discovery.test.mjs
+
+      - name: Assert each channel declares every option its own code reads
+        run: bash scripts/check-addon-options.sh ha_opencode ha_opencode_beta
+
+      - name: Run functional shell harnesses
+        run: |
+          bash scripts/test-channel-separation.sh
+          bash scripts/test-startup-hooks.sh stable
+          bash scripts/test-startup-hooks.sh beta
+
+  ha-assist:
+    name: HA 2026.10 companion and pinned OpenCode contracts (${{ matrix.channel }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - channel: beta
+            addon: ha_opencode_beta
+          - channel: stable
+            addon: ha_opencode
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.15.0
+      - name: Install pinned OpenCode runtime
+        working-directory: ${{ matrix.addon }}/rootfs/opt/opencode-v2-homeassistant
+        run: npm ci --no-audit --no-fund
+      - name: Install shared Assist authentication dependencies
+        working-directory: ${{ matrix.addon }}/rootfs/opt/ha-mcp-server
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Exercise actual HA ChatLog and companion contracts
+        env:
+          ADDON_CHANNEL: ${{ matrix.channel }}
+        run: node scripts/test-ha-assist-core.mjs
+      - name: Verify companion packaging
+        run: python3 scripts/package-ha-assist.py "${RUNNER_TEMP}/opencode-assist.zip" --channel "${{ matrix.channel }}"
+
+  mcp-server:
+    name: Home Assistant MCP server (${{ matrix.channel }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        channel:
+          - ha_opencode
+          - ha_opencode_beta
+    defaults:
+      run:
+        working-directory: ${{ matrix.channel }}/rootfs/opt/ha-mcp-server
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.15.0
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run tests
+        env:
+          # Exercise real OAuth form/redirect behavior on the hosted runner.
+          HA_MCP_BROWSER_EXECUTABLE: /usr/bin/google-chrome
+        run: npm test
+
+  lsp-server:
+    name: Home Assistant YAML language server
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ha_opencode_beta/rootfs/opt/ha-lsp-server
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.15.0
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run tests
+        run: npm test
+
+  shell:
+    name: Shell scripts and service definitions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.15.0
+
+      - name: Syntax-check every shipped shell script
+        run: |
+          status=0
+          while IFS= read -r file; do
+            head -n 1 "$file" | grep -qE '^#!.*(bash|sh|bashio)' || continue
+            if ! bash -n "$file"; then
+              echo "::error file=${file}::bash syntax error"
+              status=1
+            fi
+          done < <(find ha_opencode ha_opencode_beta scripts -type f \
+              -not -path '*/node_modules/*' \
+              \( -name '*.sh' -o -path '*/s6-rc.d/*/run' -o -path '*/s6-rc.d/*/connect' -o -path '*/usr/local/bin/*' \))
+          exit "${status}"
+
+      - name: Parse-check every shipped Node script
+        run: |
+          status=0
+          while IFS= read -r file; do
+            if ! node --check "$file"; then
+              echo "::error file=${file}::JavaScript syntax error"
+              status=1
+            fi
+          done < <(find ha_opencode ha_opencode_beta/rootfs/usr ha_opencode_beta/rootfs/opt/openchamber \
+              -type f \( -name '*.js' -o -name '*.mjs' \) \
+              -not -path '*/node_modules/*' 2>/dev/null | sort -u)
+          exit "${status}"

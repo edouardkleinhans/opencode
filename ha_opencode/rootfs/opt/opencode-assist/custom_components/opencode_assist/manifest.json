@@ -1,0 +1,14 @@
+{
+  "domain": "opencode_assist",
+  "name": "OpenCode Assist",
+  "version": "0.1.0b7",
+  "codeowners": ["@magnusoverli"],
+  "config_flow": true,
+  "dependencies": ["conversation", "llm", "ai_task"],
+  "after_dependencies": ["hassio"],
+  "documentation": "https://github.com/magnusoverli/opencode/blob/main/ha_opencode_beta/rootfs/opt/opencode-assist/custom_components/opencode_assist/README.md",
+  "issue_tracker": "https://github.com/magnusoverli/opencode/issues",
+  "integration_type": "service",
+  "iot_class": "local_push",
+  "requirements": []
+}

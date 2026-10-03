@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Compatibility spelling for the same managed V2 client, never a second daemon.
+exec /usr/local/bin/opencode "$@"

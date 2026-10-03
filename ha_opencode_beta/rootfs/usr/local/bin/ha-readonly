@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# The read-only agent belongs to the existing managed V2 server.
+exec /usr/local/bin/opencode readonly "$@"

@@ -1,0 +1,326 @@
+/**
+ * Agent capability reporting helpers.
+ *
+ * Keeps Home Assistant native LLM readiness separate from the MCP server
+ * transport so it can be tested without a running Home Assistant instance.
+ */
+
+import { describeNativeLlmApiSelection } from "./ha-llm-apis.js";
+
+const TOOL_HIGHLIGHTS = [
+  "safe_config_writing",
+  "runtime_state_queries",
+  "home_assistant_admin_cli",
+  "yaml_lsp_context",
+  "visual_verification",
+  "firmware_update_monitoring",
+  "zigbee_management",
+];
+
+const ROADMAP_NOW = [
+  "Use OpenCode MCP as the primary external agent surface for Home Assistant configuration, diagnostics, admin workflows, and visual verification.",
+  "Discover registered native LLM API IDs and names through llm/api/list, and check the configured selection separately from native MCP endpoint readiness.",
+  "Help users and custom integration authors develop and test <integration>/llm.py tool providers from inside OpenCode.",
+  "Work around the Home Assistant <= 2026.7 limitations that stop an external MCP client from using native LLM tools: no keyed /api/mcp/<API ID> endpoint, and tool schemas that strict clients cannot compile.",
+];
+
+const ROADMAP_NEXT = [
+  "Drop the tool-schema repair and the pre-2026.8 endpoint fallback once no supported Home Assistant release needs them.",
+  "Prefer native Home Assistant LLM tools for core Assist/entity control where they cover a workflow better than OpenCode MCP does.",
+  "Qualify HA 2026.10 MCP discovery, schemas, prompts and context against the pinned runtime; retain local protocol validation.",
+  "Prove a scoped conversation adapter before adding a native Assist conversation entity and AI Task entity.",
+  "Position OpenCode as a premium consumer of HA-native LLM capabilities for users testing agent-focused Home Assistant features.",
+  "Keep MCP tools for OpenCode-specific, add-on, admin, development, validation, and safety workflows that Home Assistant Core does not intend to expose through Assist.",
+];
+
+// Home Assistant releases that expose the native LLM platform to external MCP
+// clients. Everything below this is missing the keyed endpoints
+// (home-assistant/core#175570) and the tool-schema fix
+// (home-assistant/core#176814).
+const MIN_VERSION_NATIVE_LLM_PLATFORM = "2026.8.0";
+
+// Integrations that register a conversation agent.
+const KNOWN_CONVERSATION_COMPONENTS = [
+  "anthropic",
+  "cloud",
+  "google_generative_ai_conversation",
+  "litellm",
+  "llama_cpp",
+  "ollama",
+  "open_router",
+  "openai_conversation",
+  "ovhcloud_ai_endpoints",
+  "wyoming",
+];
+
+// Integrations that provide an AI task entity.
+const KNOWN_AI_TASK_COMPONENTS = [
+  "anthropic",
+  "cloud",
+  "google_generative_ai_conversation",
+  "ollama",
+  "open_router",
+  "openai_conversation",
+];
+
+const KNOWN_NATIVE_AI_COMPONENTS = [
+  ...new Set([...KNOWN_CONVERSATION_COMPONENTS, ...KNOWN_AI_TASK_COMPONENTS]),
+].sort();
+
+/**
+ * Compare a reported Home Assistant version against a `YYYY.M.P` baseline.
+ *
+ * Home Assistant versions carry suffixes such as `2026.8.0b3` or
+ * `2026.8.0.dev0`; the numeric prefix is what matters here. A pre-release of
+ * the target version counts as meeting it, because the platform work is
+ * present in the betas. Returns null when the version cannot be parsed, so
+ * callers can stay silent rather than guess.
+ */
+export function meetsHaVersion(version, minimum) {
+  const parse = (value) => {
+    const match = /^(\d+)\.(\d+)(?:\.(\d+))?/.exec(String(value ?? "").trim());
+    return match ? [Number(match[1]), Number(match[2]), Number(match[3] ?? 0)] : null;
+  };
+
+  const current = parse(version);
+  const target = parse(minimum);
+  if (!current || !target) return null;
+
+  for (let index = 0; index < 3; index += 1) {
+    if (current[index] !== target[index]) return current[index] > target[index];
+  }
+  return true;
+}
+
+/**
+ * Upstream defects that change what the bridge can do on this Home Assistant.
+ *
+ * Reported so an agent reading `get_agent_capabilities` can tell a known
+ * upstream limitation apart from a broken local configuration.
+ *
+ * Each entry carries the release that fixes it, or null when no release does
+ * yet. They are filtered per issue rather than against one blanket version,
+ * because they are not all fixed together: the keyed endpoints and the schema
+ * conversion landed in 2026.8. The older streamable-endpoint report remains
+ * unresolved; the 2026.10 unsupported-method fix is not proof it is resolved.
+ */
+function buildNativeMcpKnownIssues(version) {
+  const issues = [
+    {
+      id: "keyed_endpoints_unavailable",
+      upstream: "home-assistant/core#175570",
+      fixed_in: MIN_VERSION_NATIVE_LLM_PLATFORM,
+      impact: `Home Assistant ${version} does not serve /api/mcp/<API ID>; only the configured /api/mcp endpoint exists.`,
+      mitigation: "The bridge detects the 404 and falls back to /api/mcp automatically. A 404 on the keyed endpoint here is expected, not a misconfiguration.",
+    },
+    {
+      id: "tool_schema_anyof_empty",
+      upstream: "home-assistant/core#176762 (fixed by #176814)",
+      fixed_in: MIN_VERSION_NATIVE_LLM_PLATFORM,
+      impact: "Tool schemas built from validators such as cv.string serialize to an empty anyOf member. Strict MCP clients cannot compile them, send __unparsedToolInput instead, and Home Assistant rejects the call with \"extra keys not allowed\". GetLiveContext is affected.",
+      mitigation: "The bridge repairs the legacy unprefixed GetLiveContext schema in tools/list responses; custom and modern tool schemas pass through unchanged. Set HA_NATIVE_MCP_SANITIZE_SCHEMAS=0 to disable this repair.",
+    },
+    {
+      id: "streamable_endpoint_crash_risk",
+      upstream: "home-assistant/core#176734 (fix #176782 still open)",
+      fixed_in: null,
+      impact: "An unresolved upstream report describes malformed MCP requests causing Core errors or hangs. HA 2026.10's unsupported-method handling (#183350) does not establish that the broader report is fixed.",
+      mitigation: "The bridge validates every message as JSON-RPC 2.0 before forwarding it, so a malformed client message is rejected locally.",
+    },
+  ];
+
+  return issues.filter((issue) => {
+    // An unfixed issue applies to every version, including versions we cannot
+    // parse: staying silent there would understate a live crash risk.
+    if (issue.fixed_in === null) return true;
+
+    const meets = meetsHaVersion(version, issue.fixed_in);
+    // An unparseable version is not evidence the issue is present, so a fixed
+    // issue stays unreported rather than guessing.
+    return meets === false;
+  });
+}
+
+export function buildAgentCapabilities({
+  haConfig = {},
+  nativeMcp = {},
+  tools = [],
+  allToolCount = tools.length,
+  toolProfile = { name: "full", title: "Full", description: "Every Home Assistant MCP capability." },
+  nativeMcpBridgeEnabled = false,
+  resources = [],
+  resourceTemplates = [],
+  prompts = [],
+} = {}) {
+  const components = Array.isArray(haConfig.components) ? haConfig.components : [];
+  const nativeLlmDetected = components.includes("llm");
+  const nativeConfiguredMcp = nativeMcp.configured || nativeMcp.assist || null;
+  const nativeConfiguredMcpStatus = nativeConfiguredMcp?.status || "not_checked";
+  const configuredApiId = nativeMcp.configured_api_id !== undefined
+    ? nativeMcp.configured_api_id
+    : nativeConfiguredMcp?.api_id ?? "assist";
+  const configuredEndpointMode = nativeMcp.configured_endpoint_mode || (configuredApiId ? "keyed_api" : "configured_api");
+  const apiDiscovery = nativeMcp.api_discovery || {
+    command: "llm/api/list", minimum_version: "2026.9.0", requires_admin: true,
+    status: "not_checked", apis: [], detail: "Registered LLM APIs have not been queried.",
+  };
+  const selectedApi = describeNativeLlmApiSelection(apiDiscovery, configuredApiId);
+  const nativeConfiguredMcpAvailable = nativeConfiguredMcp?.available === true && selectedApi.status !== "unknown_api";
+  const nativeAssistMcpStatus = nativeMcp.assist?.status || "not_checked";
+  const nativeBaseMcpStatus = nativeMcp.base?.status || "not_checked";
+  const loadedNativeAiComponents = KNOWN_NATIVE_AI_COMPONENTS.filter((component) => components.includes(component));
+  const loadedConversationComponents = KNOWN_CONVERSATION_COMPONENTS.filter((component) => components.includes(component));
+  const loadedAiTaskComponents = KNOWN_AI_TASK_COMPONENTS.filter((component) => components.includes(component));
+  const recommendedMode = nativeConfiguredMcpAvailable
+    ? nativeMcpBridgeEnabled
+      ? "hybrid_native_llm_api_plus_opencode_mcp"
+      : "opencode_mcp_only_native_bridge_available"
+    : "opencode_mcp_only";
+  const haVersion = haConfig.version || "unknown";
+  const knownIssues = buildNativeMcpKnownIssues(haVersion);
+  const meetsPlatformVersion = meetsHaVersion(haVersion, MIN_VERSION_NATIVE_LLM_PLATFORM);
+
+  return {
+    surface: {
+      name: "OpenCode Home Assistant MCP",
+      role: "Primary external agent surface for this add-on",
+      compatibility: "Additive to Home Assistant's native LLM platform; does not replace Assist.",
+    },
+    home_assistant: {
+      version: haVersion,
+      native_llm_platform: {
+        minimum_version: MIN_VERSION_NATIVE_LLM_PLATFORM,
+        version_supported: meetsPlatformVersion,
+        meaning: meetsPlatformVersion === null
+          ? "The Home Assistant version could not be parsed, so native LLM platform support is unknown."
+          : meetsPlatformVersion
+            ? "This Home Assistant is new enough to carry the llm integration, the per-domain LLM tool platforms, and the keyed /api/mcp/<API ID> endpoints."
+            : `The native LLM platform (llm integration, per-domain tool platforms, keyed /api/mcp/<API ID> endpoints) first ships in Home Assistant ${MIN_VERSION_NATIVE_LLM_PLATFORM}. This instance runs ${haVersion}.`,
+      },
+      native_llm_component: {
+        component: "llm",
+        detected: nativeLlmDetected,
+        status: nativeLlmDetected ? "detected" : "not_detected",
+        meaning: nativeLlmDetected
+          ? "This Home Assistant instance reports the native llm integration as loaded."
+          : "This Home Assistant instance does not report the native llm integration yet.",
+      },
+      external_native_llm_api: {
+        available_to_addons: nativeConfiguredMcpAvailable,
+        available_to_opencode: nativeConfiguredMcpAvailable && nativeMcpBridgeEnabled,
+        bridge_enabled: nativeMcpBridgeEnabled,
+        configured_api_id: configuredApiId || null,
+        configured_endpoint_mode: configuredEndpointMode,
+        note: nativeConfiguredMcpAvailable && nativeMcpBridgeEnabled
+          ? "Home Assistant's native LLM API is reachable through the configured native MCP endpoint and is exposed to OpenCode. Use it for Assist/entity-control behavior where appropriate and keep OpenCode MCP for add-on/admin/dev workflows."
+          : nativeConfiguredMcpAvailable
+            ? "Home Assistant's native LLM API is reachable, but the add-on native MCP bridge is disabled. Enable the bridge before asking OpenCode to use its curated native tools."
+          : "Home Assistant's native llm platform may be internal-only or unavailable on this instance. Keep using OpenCode MCP as the working external agent surface.",
+      },
+      native_mcp: {
+        upstream: nativeMcp.upstream || {
+          llm_docs_pr: "home-assistant/developers.home-assistant#3236",
+          keyed_endpoint_pr: "home-assistant/core#175570",
+          endpoint_pattern: "/api/mcp/<API ID>",
+          configured_endpoint: "/api/mcp",
+          assist_api_id: "assist",
+        },
+        // What each endpoint actually serves, and who is allowed to reach it.
+        // Home Assistant requires admin for keyed endpoints other than 'assist'
+        // (mcp_server/http.py), which reads as a wall for an add-on and is not
+        // one: the Supervisor proxies add-on requests to Core as its own system
+        // user, and the hassio integration creates that user in the admin group.
+        // Every registered API ID is therefore reachable from here.
+        access_model: {
+          configured_endpoint: "/api/mcp serves every LLM API selected in MCP Server options, or all registered APIs when Expose all LLM APIs is enabled. Admin access depends on Require admin. New HA 2026.10 entries default to all APIs and admin-only access; existing entries retain their selections and access setting.",
+          keyed_endpoint: "/api/mcp/<API ID> serves exactly one registered LLM API. Home Assistant requires admin for every ID except 'assist'.",
+          selection_boundary: "MCP Server's configured-endpoint selection does not restrict the keyed endpoints. Prefer the explicit assist API for ordinary home control; select additional APIs deliberately.",
+          addon_requests_are_admin: true,
+          addon_access: "Supervisor-proxied add-on requests reach Core as the Home Assistant Supervisor system user, which is in the admin group. Any registered API ID is reachable from this add-on; an unknown-API-ID error means the ID does not exist, not that access was denied.",
+        },
+        status: selectedApi.status === "unknown_api"
+          ? "configured_api_unknown"
+          : nativeConfiguredMcpAvailable
+            ? "configured_api_available"
+            : nativeLlmDetected
+              ? "llm_detected_native_mcp_unavailable"
+              : "not_available",
+        recommended_mode: recommendedMode,
+        bridge: {
+          enabled: nativeMcpBridgeEnabled,
+          status: nativeMcpBridgeEnabled
+            ? nativeConfiguredMcpAvailable ? "enabled_and_reachable" : "enabled_endpoint_unavailable"
+            : nativeConfiguredMcpAvailable ? "disabled_endpoint_available" : "disabled",
+        },
+        configured_api_id: configuredApiId || null,
+        configured_endpoint_mode: configuredEndpointMode,
+        api_discovery: apiDiscovery,
+        selected_api: selectedApi,
+        verification: "Endpoint availability reports initialize-only probes, not successful tool catalog loading or execution.",
+        base_endpoint_status: nativeBaseMcpStatus,
+        configured_endpoint_status: nativeConfiguredMcpStatus,
+        assist_endpoint_status: nativeAssistMcpStatus,
+        base_endpoint: nativeMcp.base || null,
+        configured_endpoint: nativeConfiguredMcp,
+        assist_endpoint: nativeMcp.assist || null,
+        known_issues: knownIssues,
+        routing: {
+          native: nativeConfiguredMcpAvailable && nativeMcpBridgeEnabled
+            ? "Use homeassistant_native for Home Assistant's curated Assist/entity-control tools."
+            : nativeConfiguredMcpAvailable
+              ? "The native endpoint is ready but homeassistant_native is disabled; use homeassistant until the bridge is enabled."
+              : "Native endpoint unavailable; do not attempt native tool calls.",
+          opencode: "Use homeassistant for configuration editing, validation, diagnostics, screenshots, updates, ESPHome, Zigbee, add-on development, and other admin/dev workflows.",
+          rejection: "A native tool rejection must not trigger an automatic retry through broader administrative service tools.",
+        },
+        guidance: selectedApi.status === "unknown_api"
+          ? selectedApi.detail
+          : nativeConfiguredMcpAvailable && nativeMcpBridgeEnabled
+            ? "Prefer the configured Home Assistant native MCP API for curated native LLM tools. Prefer OpenCode MCP for configuration editing, validation, diagnostics, screenshots, updates, ESPHome, Zigbee, add-on development, and other admin/dev workflows."
+            : nativeConfiguredMcpAvailable
+              ? "The native endpoint is available but the bridge is disabled. Use OpenCode MCP until the bridge is enabled in the add-on configuration."
+              : "Native Home Assistant MCP is not available yet; use OpenCode MCP for all Home Assistant work and check again after upgrading Home Assistant.",
+      },
+      native_ai_components: {
+        known_components_checked: KNOWN_NATIVE_AI_COMPONENTS,
+        loaded: loadedNativeAiComponents,
+        conversation_agents: loadedConversationComponents,
+        ai_task_providers: loadedAiTaskComponents,
+        meaning: loadedNativeAiComponents.length > 0
+          ? "This Home Assistant instance reports one or more native AI/conversation provider components as loaded."
+          : "No known native AI/conversation provider components were found in the loaded component list.",
+      },
+    },
+    mcp: {
+      tools: tools.length,
+      all_tools: allToolCount,
+      tool_profile: {
+        name: toolProfile.name,
+        title: toolProfile.title,
+        description: toolProfile.description,
+        omitted_tools: Math.max(0, allToolCount - tools.length),
+      },
+      resources: resources.length,
+      resource_templates: resourceTemplates.length,
+      prompts: prompts.length,
+      tool_names: tools.map((tool) => tool.name).filter(Boolean),
+      highlights: TOOL_HIGHLIGHTS,
+      client_compatibility: {
+        scope: "Server-local compatibility only; this add-on does not patch or upstream changes to OpenCode's MCP client.",
+        list_tools_fields: ["name", "description", "inputSchema"],
+        call_tool_fields: ["content", "isError"],
+        structured_data_strategy: "Machine-readable summary/data/meta JSON is returned as text content because structuredContent/resourceLinks are kept out of tool responses for OpenCode compatibility.",
+        intentionally_stripped_fields: ["title", "annotations", "outputSchema", "structuredContent", "resourceLinks"],
+      },
+    },
+    strategy: {
+      current: "Keep existing MCP functionality as the complete working tool surface while Home Assistant's native LLM platform matures.",
+      native_first_when_possible: "Adopt Home Assistant native LLM capabilities when they are stable and accessible, without dropping MCP functionality users depend on.",
+      boundaries: "Native Assist tools are expected to be curated for conversation/control; OpenCode MCP remains focused on configuration editing, validation, admin/dev tasks, and safety workflows.",
+    },
+    roadmap: {
+      now: ROADMAP_NOW,
+      next: ROADMAP_NEXT,
+    },
+  };
+}

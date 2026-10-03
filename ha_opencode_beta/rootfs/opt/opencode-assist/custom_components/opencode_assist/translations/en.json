@@ -1,0 +1,35 @@
+{
+  "title": "OpenCode Assist",
+  "config": {
+    "initiate_flow": {"user": "Add app connection"},
+    "step": {
+      "supervisor": {"title": "Find the OpenCode app", "description": "Enable Assist in the OpenCode Beta app and restart the app. Restart Home Assistant Core after installing or updating the companion. Select the discovered app; connection details and credentials are exchanged automatically.", "data": {"addon_slug": "OpenCode app"}},
+      "choose_entity": {"title": "Set up OpenCode Assist", "description": "You can add one of each type, one at a time. Choose the first now; add the other later from the OpenCode Assist integration page.", "menu_options": {"conversation": "Conversation agent", "ai_task_data": "AI data task"}, "menu_option_descriptions": {"conversation": "Voice or text conversations through Assist, with optional Home Assistant control.", "ai_task_data": "Generate text or structured data for automations and scripts, such as summaries or classifications."}},
+      "hassio_confirm": {"title": "Connect OpenCode Assist", "description": "Confirm to pair with this app automatically. No URL or key needs copying. Provider charges may apply. Next, choose a model and, for conversations, the Home Assistant APIs to allow; no APIs are selected automatically. For an existing connection, confirming renews its pairing key."}
+    },
+    "error": {"cannot_connect": "Cannot connect to the app. Check that Assist is enabled and the app is running, then retry.", "invalid_auth": "Pairing key rejected or revoked.", "no_models": "No text-capable models are available in the app's managed OpenCode workspace. Connect a provider and enable a model in OpenCode, then retry.", "supervisor_unavailable": "Supervisor discovery is temporarily unavailable. Retry when Supervisor is ready.", "no_apps": "No ready OpenCode Assist app was found. Enable Assist, check its installation log, and retry after the app starts.", "discovery_expired": "The automatic pairing request expired. Submit again to fetch fresh discovery information."},
+    "abort": {"already_configured": "This app connection is already set up. To add the other entity, open [OpenCode Assist](/config/integrations/integration/opencode_assist) under Settings → Devices & services, then choose **Add conversation agent** or **Add AI data task**. Both share the existing connection.", "supervisor_unavailable": "Supervisor discovery is temporarily unavailable.", "no_apps": "The OpenCode app is not ready for automatic onboarding. Check its Assist option and installation log.", "legacy_pairing": "Remove this old manually paired integration entry, then configure the discovered OpenCode app."}
+  },
+  "config_subentries": {
+    "conversation": {
+      "entry_type": "Conversation agent",
+      "initiate_flow": {"user": "Add conversation agent", "reconfigure": "Reconfigure conversation agent"},
+      "step": {
+        "user": {"title": "Add a conversation agent", "description": "Select only the Home Assistant APIs this agent needs. No APIs are selected by default. Assist respects HA exposure and caller context.", "data": {"model": "Model", "llm_hass_api": "Home Assistant APIs", "prompt": "Instructions"}},
+        "reconfigure": {"title": "Configure conversation agent", "data": {"model": "Model", "llm_hass_api": "Home Assistant APIs", "prompt": "Instructions"}}
+      },
+      "error": {"unsupported_model": "Choose a model with tool support when selecting APIs.", "unknown_api": "A selected API is no longer registered."},
+      "abort": {"already_configured": "A conversation agent is already set up for this app connection. Use its Configure button to change its model, instructions or Home Assistant APIs. You can also add one AI data task.", "entry_not_loaded": "Load the app connection first.", "invalid_auth": "Renew the pairing key.", "cannot_connect": "Cannot connect to the app."}
+    },
+    "ai_task_data": {
+      "entry_type": "AI data task",
+      "initiate_flow": {"user": "Add AI data task", "reconfigure": "Reconfigure AI data task"},
+      "step": {
+        "user": {"title": "Add an AI data task", "description": "Generate text or schema-validated JSON. Attachments and image generation are not supported.", "data": {"model": "Model"}},
+        "reconfigure": {"title": "Configure AI data task", "data": {"model": "Model"}}
+      },
+      "error": {"unsupported_model": "Select an available model.", "unknown_api": "A selected API is no longer registered."},
+      "abort": {"already_configured": "An AI data task is already set up for this app connection. Use its Configure button to change its model. You can also add one conversation agent for Assist.", "entry_not_loaded": "Load the app connection first.", "invalid_auth": "Renew the pairing key.", "cannot_connect": "Cannot connect to the app."}
+    }
+  }
+}

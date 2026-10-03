@@ -1,0 +1,19 @@
+#!/command/with-contenv bashio
+set -eu
+if [ "$(cat /data/.interface_mode)" != openchamber ]; then
+    exec sleep infinity
+fi
+mkdir -p /data/.config/openchamber
+bashio::log.info "Starting pinned OpenChamber V2 on the existing managed backend"
+exec env -i PATH="/usr/local/bin:/usr/bin:/bin" HOME="/data" LANG="C.UTF-8" \
+    NODE_OPTIONS="--max-old-space-size=768" \
+    LD_PRELOAD="/usr/local/lib/opencode-v2-non-dumpable.so" \
+    OPENCHAMBER_DATA_DIR="/data/.config/openchamber" \
+    OPENCHAMBER_HOST="127.0.0.1" OPENCHAMBER_RELAY_HOST="off" \
+    OPENCHAMBER_SKIP_API_COMPRESSION="true" OPENCHAMBER_COMPRESS_API="false" \
+    OPENCHAMBER_BUNDLED_OPENCODE_CLI_DIR="/usr/local/bin" \
+    OPENCHAMBER_UPDATE_API_URL="http://127.0.0.1:8099/__ha_openchamber_update_check" \
+    OPENCHAMBER_OPENCODE_CWD="/run/opencode-v2/workspace" \
+    OPENCODE_HOST="http://127.0.0.1:4100" OPENCODE_SKIP_START="true" \
+    OPENCODE_DISABLE_AUTOUPDATE="true" \
+    node /opt/openchamber/managed-server.mjs

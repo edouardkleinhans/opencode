@@ -1,0 +1,7 @@
+#!/command/with-contenv bashio
+set -eu
+if ! bashio::config.true 'enable_openchamber_lan'; then exec sleep infinity; fi
+if [ "$(cat /data/.interface_mode)" != openchamber ]; then exec sleep infinity; fi
+exec env -i PATH="/usr/local/bin:/usr/bin:/bin" \
+    LD_PRELOAD="/usr/local/lib/opencode-v2-non-dumpable.so" \
+    node /opt/opencode-v2-homeassistant/lan-server.js ui

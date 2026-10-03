@@ -1,0 +1,49 @@
+# Git
+.git
+.gitignore
+
+# Documentation (not needed in image)
+*.md
+!rootfs/**/*.md
+rootfs/opt/*/README.md
+
+# Development files
+.editorconfig
+.vscode
+
+# Test infrastructure is excluded from image copies. The boundary fixture stays
+# in the build context for its read-only BuildKit bind mount.
+**/test/**
+!test/v2-boundary-fixture.sh
+!test/hab-cli-fixture.mjs
+!test/v2-openchamber-browser.mjs
+!test/v2-caller-secret-plugin.js
+!test/v2-caller-secret-native.py
+!test/v2-provider-startup-fixture.mjs
+!test/v2-zigbee-fixture.mjs
+!test/v2-lan-fixture.mjs
+!test/opencode-v2-assist-adapter.test.js
+!test/opencode-v2-assist-discovery.test.js
+!test/opencode-v2-assist-notification.test.js
+!test/opencode-v2-assist-service.test.js
+!test/opencode-v2-assist-lifecycle.test.js
+!test/assist-install.test.py
+!test/helpers/
+!test/helpers/assist-fixture.mjs
+!test/v2-ui-lan-fixture.mjs
+!test/v2-forward-fixture.py
+!test/openchamber-request-body.mjs
+!test/openchamber-lan-auth.mjs
+!test/openchamber-usage.mjs
+!test/openchamber-model-fixture.cjs
+!test/openchamber-model-regressions.inc.ts
+**/vitest.config.*
+
+# Dependencies are installed from package-lock at build time; the checked-in
+# node_modules include dev deps and would clobber the clean production install
+**/node_modules/
+
+# Build artifacts
+*.log
+**/__pycache__/
+**/*.pyc

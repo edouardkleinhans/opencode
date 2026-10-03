@@ -1,0 +1,250 @@
+---
+name: "OpenCode Beta"
+description: "Beta channel for OpenCode - AI coding agent for Home Assistant. May contain experimental features."
+version: "3.2.0b8"
+slug: "ha_opencode_beta"
+image: "ghcr.io/magnusoverli/ha_opencode_beta"
+url: "https://github.com/magnusoverli/opencode"
+arch:
+  - aarch64
+  - amd64
+startup: application
+init: false
+
+# Ingress configuration
+ingress: true
+ingress_port: 8099
+ingress_stream: true
+panel_icon: mdi:robot-outline
+panel_title: OpenCode Beta
+ports:
+  4096/tcp: null
+  4097/tcp: null
+ports_description:
+  4096/tcp: "Authenticated OpenCode LAN server — requires LAN access and a trusted HTTPS reverse proxy. Use a different host port if stable is also installed."
+  4097/tcp: "Authenticated OpenChamber LAN web UI — requires OpenChamber mode, LAN access and a trusted HTTPS reverse proxy."
+
+# File access - Home Assistant config directory
+map:
+  - type: homeassistant_config
+    read_only: false
+  - type: local_apps
+    read_only: false
+  - type: all_app_configs
+    read_only: false
+    path: /addon_configs
+
+# API access - needed for logs, addon discovery, and ingress session creation
+hassio_api: true
+hassio_role: manager
+homeassistant_api: true
+discovery:
+  - mcp
+  - opencode_assist
+
+# Security and hardware access - keep permissions minimal
+host_network: false
+privileged: []
+apparmor: true
+# Static Supervisor hardware mappings. Keep default-off; users can opt into
+# specific serial devices via the serial_devices option below.
+uart: false
+udev: false
+
+# User-configurable options.
+#
+# The Home Assistant Configuration tab renders one flat list of fields in the
+# exact key order of the schema block below — it supports no headings, no
+# collapsible sections, and no conditional visibility. Order is therefore the
+# only grouping mechanism available, so the sequence below is deliberate:
+#
+#   1. Presentation        — what the user looks at every day
+#   2. HA integration      — what OpenCode may do inside Home Assistant
+#   3. Access control      — what OpenCode may read
+#   4. Runtime             — how OpenCode itself is built and updated
+#   5. Network exposure    — what is reachable from outside
+#   6. Model providers     — where inference happens
+#   7. Optional hardware   — Zigbee2MQTT and serial passthrough
+#   8. Advanced escapes    — raw env vars and raw config
+#
+# Two rules hold throughout: a field that only makes sense when another field
+# is on sits directly beneath it, and the riskiest/rarest options sit last.
+# Keep the options and schema blocks in the same order.
+options:
+  # --- 1. Presentation ---------------------------------------------------
+  # One pinned V2 runtime shared by the terminal and OpenChamber web preview.
+  interface_mode: "terminal"
+  # Terminal appearance. No effect when interface_mode is openchamber.
+  terminal_theme: "breeze"
+  font_size: 14
+  cursor_style: "block"
+  cursor_blink: false
+  # Action-first response formatting for easier scanning and execution.
+  focus_mode: false
+
+  # --- 2. Home Assistant integration -------------------------------------
+  mcp_enabled: true
+  # Scope the built-in MCP tools to reduce tool-selection complexity and prompt
+  # size for local models. full preserves every existing tool.
+  mcp_tool_profile: "full"
+  lsp_enabled: true
+  # Screenshot tool: visual verification of dashboards and UI changes.
+  # Requires the access token below to authenticate with the HA frontend.
+  screenshot_enabled: false
+  # Long-lived access token for direct HA Core API access.
+  # Required for ESPHome ingress and the screenshot tool
+  # (create at: Profile → Long-lived access tokens).
+  access_token: ""
+  # Optional bridge to Home Assistant Core's native /api/mcp/<API ID> endpoint.
+  # Requires a Home Assistant version that includes the native MCP keyed endpoint.
+  native_ha_mcp_enabled: false
+  native_ha_mcp_api_id: "assist"
+  # Opt-in inbound MCP: automatic trusted-host setup; existing OAuth is retained.
+  ha_mcp_server_enabled: false
+  ha_assist_enabled: false
+  # Home context: what OpenCode knows about this installation before you type.
+  # The briefing is regenerated on every start (never appended to) and the
+  # decision-notes digest is capped, so neither grows over time.
+  home_briefing_enabled: true
+  decision_notes_enabled: true
+
+  # --- 3. Access control -------------------------------------------------
+  # Deny OpenCode read access to secret files (secrets.yaml, .storage, .cloud,
+  # ssl, *.key, *.pem) so their contents cannot reach the model. Set to false
+  # for fully unrestricted file access.
+  restrict_sensitive_files: true
+  # Add-on development guidance for the mounted /addons and /addon_configs
+  # folders. Guidance only — the mounts are static add-on metadata.
+  addon_access_enabled: false
+
+  # --- 4. OpenCode runtime -----------------------------------------------
+  # The add-on always runs the certified OpenCode build shipped in its image.
+  # Runtime upgrades arrive with add-on releases, so there is no update policy.
+  # CPU mode: auto (detect), baseline (for older CPUs), regular (force AVX2)
+  cpu_mode: "auto"
+
+  # --- 5. Network exposure -----------------------------------------------
+  # Authenticated frontends to the existing backend; HTTPS reverse proxy required.
+  enable_server: false
+  lan_password: ""
+  lan_trusted_proxies: []
+  server_public_url: ""
+  openchamber_public_url: ""
+  # Additional exact HTTPS browser origins for the API frontend.
+  cors_origins: []
+  # Let OpenChamber desktop/mobile apps sign in to the OpenChamber LAN UI.
+  openchamber_lan_native_apps: false
+
+  # --- 6. Model providers ------------------------------------------------
+  # Starts the internal PPQ proxy and registers native ppq-private models when
+  # a key is configured. Select a private model explicitly; no automatic switch.
+  ppq_private_enabled: false
+  ppq_api_key: ""
+
+  # --- 7. Optional hardware ----------------------------------------------
+  # Zigbee2MQTT (optional — only needed for zigporter Z2M commands, and only
+  # when auto-discovery does not find the Zigbee2MQTT add-on).
+  # Include http:// or https://. Host/IP-only values are treated as http://.
+  z2m_url: ""
+  z2m_mqtt_topic: "zigbee2mqtt"
+  # Serial devices to map into the container (optional)
+  # Add paths such as /dev/ttyUSB0, /dev/ttyACM0, or /dev/serial/by-id/...
+  serial_devices: []
+
+  # --- 8. Advanced -------------------------------------------------------
+  # Optional LAN access to the OpenChamber web UI (only used when
+  # interface_mode is openchamber). Serves OpenChamber at the root path on a
+  # mappable network port so reverse proxies / tunnels can point straight at it.
+  # Requires native OpenChamber login, also through Ingress while enabled.
+  enable_openchamber_lan: false
+  # Backend forwarding supports non-reserved provider *_API_KEY variables only.
+  # Other variables retain separate shell/service handling, with a warning.
+  env_vars: []
+  # Validated V2 subset with bounded legacy provider conversion; invalid fields stop activation.
+  opencode_config: ""
+  # Bounded external MCP definitions and their ordered tool permissions.
+  external_mcp_config: ""
+  # Run your own .sh scripts from <config>/opencode_beta/startup.d at every
+  # start. This is the supported way to extend the add-on, and it executes code
+  # the add-on did not write, as root. Off by default; last in the list because
+  # it is the option with the widest blast radius.
+  user_hooks_enabled: false
+
+schema:
+  # --- 1. Presentation ---------------------------------------------------
+  interface_mode: list(terminal|openchamber)
+  terminal_theme: list(breeze|catppuccin_mocha|catppuccin_latte|dracula|nord|tokyo_night|one_dark|solarized_dark|solarized_light|gruvbox_dark)
+  font_size: int(10,24)
+  cursor_style: list(block|underline|bar)
+  cursor_blink: bool
+  focus_mode: bool
+
+  # --- 2. Home Assistant integration -------------------------------------
+  mcp_enabled: bool
+  mcp_tool_profile: list(compact|configuration|full)
+  lsp_enabled: bool
+  screenshot_enabled: bool
+  access_token: password
+  native_ha_mcp_enabled: bool
+  native_ha_mcp_api_id: str?
+  ha_mcp_server_enabled: bool
+  ha_assist_enabled: bool
+  home_briefing_enabled: bool
+  decision_notes_enabled: bool
+
+  # --- 3. Access control -------------------------------------------------
+  restrict_sensitive_files: bool
+  addon_access_enabled: bool
+
+  # --- 4. OpenCode runtime -----------------------------------------------
+  cpu_mode: list(auto|baseline|regular)
+
+  # --- 5. Network exposure -----------------------------------------------
+  enable_server: bool
+  lan_password: password
+  lan_trusted_proxies:
+    - str
+  server_public_url: str?
+  openchamber_public_url: str?
+  cors_origins:
+    - str
+  openchamber_lan_native_apps: bool?
+
+  # --- 6. Model providers ------------------------------------------------
+  ppq_private_enabled: bool
+  ppq_api_key: password
+
+  # --- 7. Optional hardware ----------------------------------------------
+  z2m_url: str?
+  z2m_mqtt_topic: str?
+  serial_devices:
+    - device(subsystem=tty)?
+
+  # --- 8. Advanced -------------------------------------------------------
+  enable_openchamber_lan: bool
+  env_vars:
+    - name: str
+      value: str
+  opencode_config: str?
+  external_mcp_config: str?
+  user_hooks_enabled: bool
+
+# Exclude caches from backups
+backup_exclude:
+  - ".npm/*"
+  - ".npm-global/*"
+  - ".cache/*"
+  - ".local/share/opencode/cache/*"
+  - ".env_vars"
+  - ".env_vars_discovered"
+  - "evaluations/*"
+  # Generated home context is rebuilt at every start; restoring a stale copy
+  # would describe a different installation.
+  - "context/*"
+  # V2 migration candidates are disposable and may contain transient plaintext
+  # copies. Only an activated V2 generation belongs in a backup.
+  - "v2/work/*"
+  - "v2/cache/*"
+  # Startup-hook output. Hooks run with the Supervisor token and any keys the
+  # user configured, so whatever they print must not travel in a backup.
+  - "hooks/*"

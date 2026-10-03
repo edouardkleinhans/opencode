@@ -1,0 +1,47 @@
+# Dependencies (installed during Docker build)
+node_modules/
+package-lock.json
+!ha_opencode_beta/rootfs/opt/opencode-v2-homeassistant/package-lock.json
+!ha_opencode/rootfs/opt/opencode-v2-homeassistant/package-lock.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/*
+!.vscode/tasks.json
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build artifacts
+*.tgz
+__pycache__/
+*.pyc
+
+# Local maintainer guidance, implementation plans and handoff documents
+/AGENTS.md
+/RELEASING.md
+/PLAN.md
+/*_PLAN.md
+/*_WORK_ORDER.md
+/HANDOVER*.md
+/*_HANDOVER*.md
+/HANDOFF*.md
+/*_HANDOFF*.md
+/plans/
+/handover/
+/handoffs/
+/work-orders/
+/internal/
+/docs/internal/
+
+# Component implementation docs and manual acceptance notes
+/ha_opencode*/rootfs/opt/*/README.md
+/ha_opencode*/test/*-acceptance.md

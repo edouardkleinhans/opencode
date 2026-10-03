@@ -1,0 +1,167 @@
+---
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Both release workflows push to main. Serialise them so a v* and a beta-v*
+# released close together queue instead of one dying on a non-fast-forward
+# after its images are already public.
+concurrency:
+  group: push-to-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+
+      - name: Verify the tag was cut from main
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Both channels ship from main. What separates them is the folder the
+          # add-on lives in — this release publishes ha_opencode/, and beta
+          # work lives in ha_opencode_beta/ where a stable build cannot reach
+          # it. Home Assistant only reads the default branch, so a tag off main
+          # could not be served anyway.
+          if ! git merge-base --is-ancestor "${TAG}^{commit}" HEAD; then
+            echo "::error::Stable tag ${TAG} is not reachable from main."
+            echo "::error::Both channels release from main; merge the work and tag again."
+            exit 1
+          fi
+
+          # main is allowed to have moved on for beta-only reasons (a beta
+          # version bump does exactly that). It is NOT allowed to have moved
+          # the stable add-on itself, because this job publishes main's
+          # ha_opencode/ as the storefront for an image built from the tag.
+          if ! git diff --quiet "${TAG}" HEAD -- ha_opencode/; then
+            echo "::error::main has moved past ${TAG} inside ha_opencode/."
+            echo "::error::The published storefront would not match the image built from ${TAG}."
+            git diff --stat "${TAG}" HEAD -- ha_opencode/
+            echo "::error::Either tag main's current tip, or reset main to ${TAG}."
+            exit 1
+          fi
+
+          echo "OK: ${TAG} is on main and ha_opencode/ matches main's tip."
+
+      - name: Guard against publishing a downgrade
+        env:
+          NEW: ${{ steps.version.outputs.version }}
+        run: |
+          # Supervisor's update check is `version != latest_version`, not `>`.
+          # Publishing a lower version pushes it to every user as an update.
+          CURRENT=$(sed -n 's/^version: "\(.*\)"$/\1/p' ha_opencode/config.yaml)
+          echo "main currently advertises: ${CURRENT}"
+          echo "this release would set:    ${NEW}"
+
+          if [ "${CURRENT}" = "${NEW}" ]; then
+            echo "Version unchanged — nothing to guard."
+            exit 0
+          fi
+
+          HIGHEST=$(printf '%s\n%s\n' "${CURRENT}" "${NEW}" | sort -V | tail -1)
+          if [ "${HIGHEST}" != "${NEW}" ]; then
+            echo "::error::Refusing to publish ${NEW}: main already advertises ${CURRENT}."
+            echo "::error::A lower version is offered to every stable user as an update."
+            exit 1
+          fi
+
+      - name: Update version in config.yaml
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          sed -i "s/^version: .*/version: \"${VERSION}\"/" ha_opencode/config.yaml
+          sed -i 's|^image: .*|image: "ghcr.io/magnusoverli/ha_opencode"|' ha_opencode/config.yaml
+
+          # Assert the sed actually matched. Previously a silently-unmatched
+          # pattern was indistinguishable from "already correct".
+          grep -qx "version: \"${VERSION}\"" ha_opencode/config.yaml || {
+            echo "::error::version: line was not rewritten to \"${VERSION}\"."
+            grep -n "^version:" ha_opencode/config.yaml
+            exit 1
+          }
+          grep -qx 'image: "ghcr.io/magnusoverli/ha_opencode"' ha_opencode/config.yaml || {
+            echo "::error::image: line was not rewritten."
+            grep -n "^image:" ha_opencode/config.yaml
+            exit 1
+          }
+
+      - name: Commit version update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ha_opencode/config.yaml
+
+          if git diff --cached --quiet; then
+            echo "main already advertises ${{ steps.version.outputs.version }} — nothing to commit."
+          else
+            git commit -m "chore: bump version to ${{ steps.version.outputs.version }}"
+          fi
+
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then
+              echo "Pushed to main on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Push rejected (attempt ${attempt}); rebasing on origin/main and retrying."
+            git fetch origin main
+            git rebase origin/main || {
+              echo "::error::Rebase onto origin/main conflicted. Resolve by hand."
+              exit 1
+            }
+          done
+
+          echo "::error::Could not push the version bump to main after 3 attempts."
+          exit 1
+
+      - name: Extract changelog
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # Extract content between "## VERSION" and the next "## " header
+          # Uses a flag to skip the matching header line and stop before the next one
+          CHANGELOG=$(awk "
+            /^## ${VERSION}$/ { found=1; next }
+            found && /^## / { exit }
+            found { print }
+          " ha_opencode/CHANGELOG.md)
+
+          if [ -z "${CHANGELOG}" ]; then
+            echo "::warning::No '## ${VERSION}' section found in ha_opencode/CHANGELOG.md — the release body will be empty."
+          fi
+
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Package the matching optional HA companion
+        run: python3 scripts/package-ha-assist.py "${RUNNER_TEMP}/opencode-assist.zip" --channel stable
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: ${{ steps.changelog.outputs.content }}
+          draft: false
+          prerelease: false
+          files: ${{ runner.temp }}/opencode-assist.zip
